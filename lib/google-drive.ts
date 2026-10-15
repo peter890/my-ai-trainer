@@ -22,7 +22,15 @@ export const GOOGLE_DRIVE_FILE_NAMES = {
 const GOOGLE_OAUTH_SCRIPT_URL = 'https://accounts.google.com/gsi/client'
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const DRIVE_TOKEN_EVENT = 'ai-trainer:drive-token-changed'
-const SILENT_AUTH_ERRORS = new Set(['interaction_required', 'login_required', 'consent_required'])
+export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = 'ai-trainer.drive.access-token'
+const GOOGLE_DRIVE_TOKEN_EXPIRY_BUFFER_MS = 60_000
+
+const StoredGoogleDriveTokenSchema = z
+  .object({
+    access_token: z.string().min(1),
+    expires_at: z.number().int().positive(),
+  })
+  .strict()
 
 export function getGoogleDriveClientId(): string {
   return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? ''
@@ -40,7 +48,7 @@ declare global {
           initTokenClient: (config: {
             client_id: string
             scope: string
-            callback: (response: { access_token?: string; error?: string }) => void
+            callback: (response: { access_token?: string; expires_in?: number; error?: string }) => void
             error_callback?: (error: { error?: string; error_description?: string }) => void
           }) => {
             requestAccessToken: (options?: { prompt?: 'consent' | 'select_account' | 'none' }) => void
@@ -61,11 +69,13 @@ function ensureBrowser(): void {
 }
 
 export function getGoogleDriveAccessToken(): string | null {
-  return accessToken
+  const persistedToken = readPersistedGoogleDriveToken()
+  accessToken = persistedToken
+  return persistedToken
 }
 
 export function isGoogleDriveConnected(): boolean {
-  return accessToken !== null && accessToken.length > 0
+  return getGoogleDriveAccessToken() !== null
 }
 
 export function refreshGoogleDriveTokenState(): void {
@@ -127,89 +137,100 @@ export async function connectGoogleDrive(): Promise<string> {
     throw new Error('Google Identity Services nie jest dostępne w tej przeglądarce.')
   }
 
-  const token = await requestGoogleDriveToken(googleOauth, clientId, 'consent')
-  accessToken = token
+  const response = await requestGoogleDriveToken(googleOauth, clientId)
+  if (!response.expires_in || !Number.isFinite(response.expires_in) || response.expires_in <= 0) {
+    throw new Error('Google nie zwróciło czasu ważności tokena. Połączenie nie zostało zapisane.')
+  }
+
+  const expiresAt = Date.now() + response.expires_in * 1000
+  const persistedToken = StoredGoogleDriveTokenSchema.parse({
+    access_token: response.access_token,
+    expires_at: expiresAt,
+  })
+  try {
+    window.localStorage.setItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY, JSON.stringify(persistedToken))
+  } catch {
+    throw new Error('Nie można zapisać sesji Google Drive w tej przeglądarce. Sprawdź ustawienia pamięci witryny.')
+  }
+
+  accessToken = persistedToken.access_token
   refreshGoogleDriveTokenState()
-  return token
+  return accessToken
 }
 
 export async function restoreGoogleDriveConnection(): Promise<boolean> {
   ensureBrowser()
 
-  if (accessToken) return true
-  const clientId = getGoogleDriveClientId()
-  if (!clientId) return false
-
-  await ensureGoogleScriptLoaded()
-
-  const googleOauth = window.google?.accounts?.oauth2
-  if (!googleOauth) {
-    throw new Error('Google Identity Services nie jest dostępne w tej przeglądarce.')
-  }
-
-  try {
-    accessToken = await requestGoogleDriveToken(googleOauth, clientId, 'none')
-    refreshGoogleDriveTokenState()
-    return true
-  } catch (cause) {
-    if (cause instanceof GoogleDriveAuthError && SILENT_AUTH_ERRORS.has(cause.code)) {
-      return false
-    }
-    throw cause
-  }
-}
-
-class GoogleDriveAuthError extends Error {
-  constructor(
-    message: string,
-    readonly code: string,
-  ) {
-    super(message)
-    this.name = 'GoogleDriveAuthError'
-  }
+  accessToken = readPersistedGoogleDriveToken()
+  return accessToken !== null
 }
 
 function requestGoogleDriveToken(
   googleOauth: NonNullable<NonNullable<Window['google']>['accounts']>['oauth2'],
   clientId: string,
-  prompt: 'consent' | 'none',
-): Promise<string> {
+): Promise<{ access_token: string; expires_in: number }> {
   if (!googleOauth) {
     return Promise.reject(new Error('Google Identity Services nie jest dostępne w tej przeglądarce.'))
   }
 
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<{ access_token: string; expires_in: number }>((resolve, reject) => {
     const tokenClient = googleOauth.initTokenClient({
       client_id: clientId,
       scope: GOOGLE_DRIVE_SCOPE,
       callback: (response) => {
-        if (response.access_token) {
-          resolve(response.access_token)
+        if (response.access_token && response.expires_in) {
+          resolve({ access_token: response.access_token, expires_in: response.expires_in })
           return
         }
 
-        const code = response.error ?? 'access_token_missing'
         const message = response.error ?? 'Nie udało się uzyskać tokena dostępu dla Google Drive.'
-        reject(new GoogleDriveAuthError(message, code))
+        reject(new Error(message))
       },
       error_callback: (error) => {
-        const code = error.error ?? 'oauth_error'
         const message = error.error_description ?? error.error ?? 'Błąd logowania do Google Drive.'
-        reject(new GoogleDriveAuthError(message, code))
+        reject(new Error(message))
       },
     })
 
-    tokenClient.requestAccessToken({ prompt })
+    tokenClient.requestAccessToken()
   })
 }
 
 export function disconnectGoogleDrive(): void {
   accessToken = null
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)
+  }
   refreshGoogleDriveTokenState()
 }
 
+export function readPersistedGoogleDriveToken(storage?: Storage, now = Date.now()): string | null {
+  const resolvedStorage = storage ?? (typeof window !== 'undefined' ? window.localStorage : null)
+  if (!resolvedStorage) return null
+
+  const rawToken = resolvedStorage.getItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)
+  if (!rawToken) return null
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(rawToken)
+  } catch {
+    resolvedStorage.removeItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)
+    return null
+  }
+
+  const result = StoredGoogleDriveTokenSchema.safeParse(parsed)
+  if (!result.success || result.data.expires_at <= now + GOOGLE_DRIVE_TOKEN_EXPIRY_BUFFER_MS) {
+    resolvedStorage.removeItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)
+    return null
+  }
+
+  return result.data.access_token
+}
+
 async function fetchDriveResource(path: string, init: RequestInit = {}): Promise<Response> {
-  if (!accessToken) {
+  const token = getGoogleDriveAccessToken()
+  if (!token) {
     throw new Error('Brak aktywnego połączenia z Google Drive.')
   }
 
@@ -312,7 +333,7 @@ export function createDriveSyncSummary(): string {
   if (isGoogleDriveConnected()) {
     return 'Google Drive jest połączone i gotowe do synchronizacji.'
   }
-  return 'Google Drive jest gotowe do połączenia. Token jest przechowywany tylko w pamięci.'
+  return 'Google Drive jest gotowe do połączenia. Po autoryzacji sesja będzie pamiętana do wygaśnięcia tokena.'
 }
 
 export const DRIVE_SYNC_QUEUE_STORAGE_KEY = 'ai-trainer.drive-sync.queue'

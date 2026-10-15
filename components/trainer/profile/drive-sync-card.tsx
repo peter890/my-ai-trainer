@@ -215,8 +215,8 @@ export function DriveSyncCard() {
         <div className="rounded-xl bg-secondary/40 p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">Status:</p>
           <p className="mt-1">
-            Klucz Gemini pozostaje lokalny. Token Drive jest tylko w pamięci; po ponownym wejściu aplikacja próbuje
-            przywrócić dostęp bez pytania o zgodę.
+            Klucz Gemini pozostaje lokalny. Token Drive jest zapisany w pamięci przeglądarki do wygaśnięcia, aby
+            odświeżenie strony nie wymagało ponownego łączenia. Kod strony może odczytać ten token.
           </p>
           <p className="mt-2 text-foreground">
             Kolejka zmian: <span className="font-medium">{queueLength}</span>
