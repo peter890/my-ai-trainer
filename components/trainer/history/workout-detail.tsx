@@ -1,14 +1,12 @@
 import { Bot, Coffee, NotebookPen } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { numberFormat, workoutTypeMeta } from '@/lib/format'
+import { formatHistoryDate, numberFormat, workoutTypeMeta } from '@/lib/format'
 import type { WorkoutLog } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
-const longFormatter = new Intl.DateTimeFormat('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
-
 export function WorkoutDetail({ date, log }: { date: string; log?: WorkoutLog }) {
-  const dateLabel = longFormatter.format(new Date(`${date}T12:00:00`))
+  const dateLabel = formatHistoryDate(date)
 
   if (!log) {
     return (
@@ -18,8 +16,10 @@ export function WorkoutDetail({ date, log }: { date: string; log?: WorkoutLog })
             <Coffee className="size-6" aria-hidden="true" />
           </div>
           <div>
-            <p className="font-semibold">Dzień regeneracji</p>
-            <p className="text-sm text-muted-foreground first-letter:uppercase">{dateLabel}</p>
+            <p className="font-semibold">{dateLabel ? 'Dzień regeneracji' : 'Wybierz dzień'}</p>
+            <p className="text-sm text-muted-foreground first-letter:uppercase">
+              {dateLabel ?? 'Wybierz dzień w kalendarzu, aby zobaczyć szczegóły.'}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -33,7 +33,7 @@ export function WorkoutDetail({ date, log }: { date: string; log?: WorkoutLog })
       <CardContent className="flex flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm text-muted-foreground first-letter:uppercase">{dateLabel}</p>
+            <p className="text-sm text-muted-foreground first-letter:uppercase">{dateLabel ?? 'Data nieznana'}</p>
             <h2 className="mt-0.5 text-2xl font-semibold tracking-tight">{log.title}</h2>
           </div>
           <Badge variant="outline" className="gap-1.5">

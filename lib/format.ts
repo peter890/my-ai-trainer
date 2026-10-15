@@ -19,3 +19,17 @@ export function formatDuration(totalSeconds: number, withHours = true) {
 }
 
 export const numberFormat = new Intl.NumberFormat('pl-PL')
+
+export function formatHistoryDate(date: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+
+  const parsed = new Date(`${date}T12:00:00.000Z`)
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null
+
+  return new Intl.DateTimeFormat('pl-PL', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(parsed)
+}
