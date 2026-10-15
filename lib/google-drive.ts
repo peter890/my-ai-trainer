@@ -20,7 +20,7 @@ export const GOOGLE_DRIVE_FILE_NAMES = {
 } as const
 
 const GOOGLE_OAUTH_SCRIPT_URL = 'https://accounts.google.com/gsi/client'
-const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const DRIVE_TOKEN_EVENT = 'ai-trainer:drive-token-changed'
 
 export function getGoogleDriveClientId(): string {
