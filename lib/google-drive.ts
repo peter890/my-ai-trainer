@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import {z} from 'zod'
 
 export const GoogleDriveSyncStatusSchema = z.enum(['idle', 'connecting', 'connected', 'error'])
 export type GoogleDriveSyncStatus = z.infer<typeof GoogleDriveSyncStatusSchema>
@@ -20,7 +20,7 @@ export const GOOGLE_DRIVE_FILE_NAMES = {
 } as const
 
 const GOOGLE_OAUTH_SCRIPT_URL = 'https://accounts.google.com/gsi/client'
-const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const DRIVE_TOKEN_EVENT = 'ai-trainer:drive-token-changed'
 
 export function getGoogleDriveClientId(): string {
@@ -355,11 +355,10 @@ function getUpdatedAt(value: unknown): string | undefined {
   const candidate = value as Record<string, unknown>
   if (typeof candidate.updated_at === 'string') return candidate.updated_at
   if (Array.isArray(candidate)) {
-    const latest = candidate
-      .map((entry) => getUpdatedAt(entry))
-      .filter((timestamp): timestamp is string => typeof timestamp === 'string')
-      .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
-    return latest
+    return candidate
+        .map((entry) => getUpdatedAt(entry))
+        .filter((timestamp): timestamp is string => typeof timestamp === 'string')
+        .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
   }
 
   if ('profile' in candidate && candidate.profile && typeof candidate.profile === 'object') {
