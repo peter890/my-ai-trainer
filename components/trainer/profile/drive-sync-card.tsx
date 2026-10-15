@@ -10,6 +10,7 @@ import {
   getDriveSyncQueueLength,
   hasGoogleDriveClientId,
   isGoogleDriveConnected,
+  restoreGoogleDriveConnection,
   subscribeToGoogleDriveToken,
   syncDriveReplica,
 } from '@/lib/google-drive'
@@ -32,8 +33,27 @@ export function DriveSyncCard() {
       setError('')
     }
 
+    let active = true
     syncState()
-    return subscribeToGoogleDriveToken(syncState)
+
+    const unsubscribe = subscribeToGoogleDriveToken(syncState)
+    if (hasGoogleDriveClientId() && !isGoogleDriveConnected()) {
+      void restoreGoogleDriveConnection()
+        .then(() => {
+          if (active) syncState()
+        })
+        .catch((cause) => {
+          if (!active) return
+          setStatus('error')
+          setError(cause instanceof Error ? cause.message : 'Nie udało się przywrócić połączenia z Google Drive.')
+          setMessage('Nie udało się przywrócić połączenia z Google Drive.')
+        })
+    }
+
+    return () => {
+      active = false
+      unsubscribe()
+    }
   }, [])
 
   const handleConnect = async () => {
@@ -195,7 +215,8 @@ export function DriveSyncCard() {
         <div className="rounded-xl bg-secondary/40 p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">Status:</p>
           <p className="mt-1">
-            Klucz Gemini pozostaje lokalny, a token Google Drive jest przechowywany tylko w pamięci przeglądarki.
+            Klucz Gemini pozostaje lokalny. Token Drive jest tylko w pamięci; po ponownym wejściu aplikacja próbuje
+            przywrócić dostęp bez pytania o zgodę.
           </p>
           <p className="mt-2 text-foreground">
             Kolejka zmian: <span className="font-medium">{queueLength}</span>

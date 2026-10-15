@@ -22,6 +22,7 @@ export const GOOGLE_DRIVE_FILE_NAMES = {
 const GOOGLE_OAUTH_SCRIPT_URL = 'https://accounts.google.com/gsi/client'
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const DRIVE_TOKEN_EVENT = 'ai-trainer:drive-token-changed'
+const SILENT_AUTH_ERRORS = new Set(['interaction_required', 'login_required', 'consent_required'])
 
 export function getGoogleDriveClientId(): string {
   return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? ''
@@ -126,29 +127,79 @@ export async function connectGoogleDrive(): Promise<string> {
     throw new Error('Google Identity Services nie jest dostępne w tej przeglądarce.')
   }
 
+  const token = await requestGoogleDriveToken(googleOauth, clientId, 'consent')
+  accessToken = token
+  refreshGoogleDriveTokenState()
+  return token
+}
+
+export async function restoreGoogleDriveConnection(): Promise<boolean> {
+  ensureBrowser()
+
+  if (accessToken) return true
+  const clientId = getGoogleDriveClientId()
+  if (!clientId) return false
+
+  await ensureGoogleScriptLoaded()
+
+  const googleOauth = window.google?.accounts?.oauth2
+  if (!googleOauth) {
+    throw new Error('Google Identity Services nie jest dostępne w tej przeglądarce.')
+  }
+
+  try {
+    accessToken = await requestGoogleDriveToken(googleOauth, clientId, 'none')
+    refreshGoogleDriveTokenState()
+    return true
+  } catch (cause) {
+    if (cause instanceof GoogleDriveAuthError && SILENT_AUTH_ERRORS.has(cause.code)) {
+      return false
+    }
+    throw cause
+  }
+}
+
+class GoogleDriveAuthError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message)
+    this.name = 'GoogleDriveAuthError'
+  }
+}
+
+function requestGoogleDriveToken(
+  googleOauth: NonNullable<NonNullable<Window['google']>['accounts']>['oauth2'],
+  clientId: string,
+  prompt: 'consent' | 'none',
+): Promise<string> {
+  if (!googleOauth) {
+    return Promise.reject(new Error('Google Identity Services nie jest dostępne w tej przeglądarce.'))
+  }
+
   return new Promise<string>((resolve, reject) => {
     const tokenClient = googleOauth.initTokenClient({
       client_id: clientId,
       scope: GOOGLE_DRIVE_SCOPE,
       callback: (response) => {
         if (response.access_token) {
-          accessToken = response.access_token
-          refreshGoogleDriveTokenState()
           resolve(response.access_token)
           return
         }
 
+        const code = response.error ?? 'access_token_missing'
         const message = response.error ?? 'Nie udało się uzyskać tokena dostępu dla Google Drive.'
-        accessToken = null
-        reject(new Error(message))
+        reject(new GoogleDriveAuthError(message, code))
       },
       error_callback: (error) => {
-        accessToken = null
-        reject(new Error(error.error_description ?? error.error ?? 'Błąd logowania do Google Drive.'))
+        const code = error.error ?? 'oauth_error'
+        const message = error.error_description ?? error.error ?? 'Błąd logowania do Google Drive.'
+        reject(new GoogleDriveAuthError(message, code))
       },
     })
 
-    tokenClient.requestAccessToken({ prompt: 'consent' })
+    tokenClient.requestAccessToken({ prompt })
   })
 }
 
