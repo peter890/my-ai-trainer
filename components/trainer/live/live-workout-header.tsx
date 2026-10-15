@@ -2,7 +2,7 @@
 
 import { ChevronDown, Pause, Play, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { formatDuration } from '@/lib/trainer-data'
+import { formatDuration } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type Props = {

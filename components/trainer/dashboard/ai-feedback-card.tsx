@@ -1,13 +1,15 @@
 import { Bot, Check } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-import { aiFeedback } from '@/lib/trainer-data'
 
 type Props = {
-  status: 'idle' | 'loading' | 'done'
+  status: 'idle' | 'loading' | 'done' | 'error'
+  analysisText?: string
+  errorText?: string
   onArchive: () => void
+  onRetry?: () => void
 }
 
-export function AiFeedbackCard({ status, onArchive }: Props) {
+export function AiFeedbackCard({ status, analysisText, errorText, onArchive, onRetry }: Props) {
   return (
     <Card className="min-h-80">
       <CardContent className="flex h-full flex-col gap-4">
@@ -17,7 +19,7 @@ export function AiFeedbackCard({ status, onArchive }: Props) {
           </div>
           <div>
             <h2 className="font-semibold">Analiza Trenera AI</h2>
-            <p className="text-xs text-muted-foreground">Gemini · na podstawie 20 ostatnich sesji</p>
+            <p className="text-xs text-muted-foreground">Gemini · indywidualna rekomendacja na kolejną sesję</p>
           </div>
         </div>
 
@@ -38,22 +40,25 @@ export function AiFeedbackCard({ status, onArchive }: Props) {
           </div>
         )}
 
+        {status === 'error' && (
+          <div className="flex flex-1 flex-col justify-center gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+            <p className="text-sm font-medium text-destructive">Nie udało się wygenerować analizy.</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{errorText || 'Sprawdź połączenie z siecią i klucz API Gemini, a następnie spróbuj ponownie.'}</p>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-auto flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/50 text-sm font-medium transition-colors hover:bg-secondary"
+              >
+                Spróbuj ponownie
+              </button>
+            )}
+          </div>
+        )}
+
         {status === 'done' && (
           <article className="flex flex-1 flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <p className="text-sm leading-relaxed text-foreground/90">{aiFeedback.summary}</p>
-            {aiFeedback.sections.map((section) => (
-              <section key={section.title}>
-                <h3 className="mb-2 text-sm font-semibold text-primary">{section.title}</h3>
-                <ul className="flex flex-col gap-1.5">
-                  {section.items.map((item) => (
-                    <li key={item} className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden="true" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
+            <p className="text-sm leading-relaxed text-foreground/90">{analysisText || 'Analiza została wygenerowana.'}</p>
             <button
               type="button"
               onClick={onArchive}

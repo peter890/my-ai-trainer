@@ -1,11 +1,35 @@
+import { useEffect, useState } from 'react'
 import { ChevronRight, TrendingDown } from 'lucide-react'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { weightHistory } from '@/lib/trainer-data'
+import { getProfile } from '@/lib/repositories'
 import { WeightChart } from '../weight-chart'
 
 export function WeightTrendCard({ onOpenProfile, className }: { onOpenProfile: () => void; className?: string }) {
-  const current = weightHistory.at(-1)!.weight
-  const first = weightHistory[0].weight
+  const [weights, setWeights] = useState<{ date: string; weight: number }[]>([])
+  const [status, setStatus] = useState<'loading' | 'ready' | 'empty'>('loading')
+
+  useEffect(() => {
+    let active = true
+
+    void getProfile().then((profile) => {
+      if (!active) return
+
+      const nextWeights = (profile?.profile.weight_history ?? []).map((entry) => ({
+        date: entry.date.slice(5).replace('-', '.'),
+        weight: Number(entry.weight_kg.toFixed(1)),
+      }))
+
+      setWeights(nextWeights)
+      setStatus(nextWeights.length > 0 ? 'ready' : 'empty')
+    })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const current = weights.at(-1)?.weight ?? 0
+  const first = weights[0]?.weight ?? 0
   const diff = current - first
 
   return (
@@ -34,7 +58,13 @@ export function WeightTrendCard({ onOpenProfile, className }: { onOpenProfile: (
             {diff.toLocaleString('pl-PL', { maximumFractionDigits: 1 })} kg
           </span>
         </div>
-        <WeightChart data={weightHistory} compact className="h-28" />
+        {status === 'empty' ? (
+          <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+            Brak pomiarów wagi — dodaj pierwszy pomiar w profilu.
+          </p>
+        ) : (
+          <WeightChart data={weights} compact className="h-28" />
+        )}
       </CardContent>
     </Card>
   )

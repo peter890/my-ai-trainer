@@ -1,6 +1,6 @@
-import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
+import { PwaRegister } from '@/components/pwa-register'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin', 'latin-ext'], variable: '--font-inter' })
@@ -10,11 +10,13 @@ export const metadata: Metadata = {
   title: 'AI Trainer PWA — Twój osobisty trener AI',
   description:
     'Trener personalny AI: rejestruj treningi na siłowni, śledź postępy i otrzymuj analizy Gemini po każdej sesji.',
-  generator: 'v0.app',
   applicationName: 'AI Trainer',
   appleWebApp: { capable: true, title: 'AI Trainer', statusBarStyle: 'black-translucent' },
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    icon: [
+      { url: '/icons/ai-trainer-192.png', type: 'image/png' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
     apple: '/apple-icon.png',
   },
 }
@@ -35,8 +37,8 @@ export default function RootLayout({
   return (
     <html lang="pl" className={`dark ${inter.variable} ${mono.variable}`}>
       <body className="font-sans antialiased">
+        <PwaRegister />
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )

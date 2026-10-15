@@ -1,6 +1,6 @@
 import { SkipForward, Timer } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-import { formatDuration } from '@/lib/trainer-data'
+import { formatDuration } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type Props = {

@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,12 +14,26 @@ function bmiCategory(bmi: number) {
   return 'Otyłość'
 }
 
-export function BiometricsCard({ weight }: { weight: number }) {
-  const [gender, setGender] = useState<(typeof genders)[number]>('Mężczyzna')
-  const [age, setAge] = useState('29')
-  const [height, setHeight] = useState('182')
+type BiometricsCardProps = {
+  gender: (typeof genders)[number]
+  age: number
+  height: number
+  weight: number
+  onGenderChange: (value: (typeof genders)[number]) => void
+  onAgeChange: (value: number) => void
+  onHeightChange: (value: number) => void
+}
 
-  const h = Number(height) / 100
+export function BiometricsCard({
+  gender,
+  age,
+  height,
+  weight,
+  onGenderChange,
+  onAgeChange,
+  onHeightChange,
+}: BiometricsCardProps) {
+  const h = height / 100
   const bmi = h > 0 ? weight / (h * h) : 0
 
   return (
@@ -37,7 +50,7 @@ export function BiometricsCard({ weight }: { weight: number }) {
               <button
                 key={g}
                 type="button"
-                onClick={() => setGender(g)}
+                onClick={() => onGenderChange(g)}
                 aria-pressed={gender === g}
                 className={cn(
                   'h-10 rounded-lg text-sm font-medium transition-colors',
@@ -51,8 +64,14 @@ export function BiometricsCard({ weight }: { weight: number }) {
         </fieldset>
 
         <div className="grid grid-cols-3 gap-3">
-          <Field id="age" label="Wiek" unit="lat" value={age} onChange={setAge} />
-          <Field id="height" label="Wzrost" unit="cm" value={height} onChange={setHeight} />
+          <Field id="age" label="Wiek" unit="lat" value={String(age)} onChange={(v) => onAgeChange(Number(v) || 0)} />
+          <Field
+            id="height"
+            label="Wzrost"
+            unit="cm"
+            value={String(height)}
+            onChange={(v) => onHeightChange(Number(v) || 0)}
+          />
           <Field id="weight" label="Waga" unit="kg" value={weight.toLocaleString('pl-PL')} readOnly />
         </div>
 

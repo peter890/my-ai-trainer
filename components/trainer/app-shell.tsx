@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
+import { getWorkouts } from '@/lib/repositories'
 import type { TabId } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 import { BottomNav, Logo, Sidebar } from './navigation'
@@ -16,7 +17,31 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [liveActive, setLiveActive] = useState(false)
   const [liveVisible, setLiveVisible] = useState(false)
-  const [hasUnfinalized, setHasUnfinalized] = useState(true)
+  const [hasUnfinalized, setHasUnfinalized] = useState(false)
+
+  useEffect(() => {
+    let active = true
+
+    void getWorkouts()
+      .then((workouts) => {
+        if (!active) return
+        const ongoing = workouts.find((workout) => workout.status === 'in_progress')
+        if (ongoing) {
+          setLiveActive(true)
+          setLiveVisible(true)
+        }
+        setHasUnfinalized(workouts.some((workout) => workout.status === 'pending_finalization'))
+      })
+      .catch(() => {
+        if (active) {
+          setHasUnfinalized(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const selectTab = (next: TabId) => {
     setTab(next)

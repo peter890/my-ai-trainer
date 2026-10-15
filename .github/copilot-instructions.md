@@ -1,0 +1,12 @@
+# Zasady projektu
+- Projekt: AI Trainer (Gymini), PWA, Next.js (static export) + TypeScript + Tailwind + shadcn/ui.
+- Pełna specyfikacja: PRD.md. Przy wątpliwościach ona ma pierwszeństwo, z wyjątkami poniżej.
+- Brak własnego backendu. Źródłem prawdy jest IndexedDB, Google Drive appDataFolder to replika.
+- Klucz Gemini API NIGDY nie trafia do plików synchronizowanych z Drive ani do logów. Tylko lokalnie.
+- Nazwa modelu Gemini jest w jednym miejscu: lib/config.ts (GEMINI_MODEL). Nie wpisuj jej w kodzie na stałe.
+- Czas sesji i przerw liczymy z timestampów (Date.now()), nigdy z licznika setInterval.
+- Każda funkcja przetwarzająca dane ma typy z zod (lib/schemas.ts) i testy jednostkowe w Vitest.
+- UI: mobile-first, dark mode domyślnie, kolory: tło #09090b, karty #18181b, akcent #10b981.
+- Teksty interfejsu po polsku, kod i nazwy zmiennych po angielsku.
+- Nie przepisuj istniejących komponentów z szablonu v0, tylko je podłączaj do stanu i danych.
+- Małe, atomowe zmiany. Nie dodawaj bibliotek bez uzasadnienia.

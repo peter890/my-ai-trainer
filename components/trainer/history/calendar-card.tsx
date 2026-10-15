@@ -3,7 +3,8 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { workoutTypeMeta, type WorkoutLog, type WorkoutType } from '@/lib/trainer-data'
+import { workoutTypeMeta } from '@/lib/format'
+import type { WorkoutLog, WorkoutType } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
 const weekdays = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd']

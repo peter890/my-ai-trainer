@@ -1,7 +1,8 @@
 import { Bot, Coffee, NotebookPen } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { numberFormat, workoutTypeMeta, type WorkoutLog } from '@/lib/trainer-data'
+import { numberFormat, workoutTypeMeta } from '@/lib/format'
+import type { WorkoutLog } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
 const longFormatter = new Intl.DateTimeFormat('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })

@@ -1,23 +1,64 @@
 'use client'
 
-import { useState } from 'react'
-import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react'
+import { useState, useSyncExternalStore } from 'react'
+import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Trash2 } from 'lucide-react'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { testGeminiConnection } from '@/lib/gemini'
+import {
+  getGeminiApiKeySnapshot,
+  INVALID_GEMINI_API_KEY_SNAPSHOT,
+  removeGeminiApiKey,
+  saveGeminiApiKey,
+  subscribeToGeminiApiKey,
+} from '@/lib/local-secrets'
 import { cn } from '@/lib/utils'
 
-type Status = 'idle' | 'testing' | 'ok'
+type Status = 'idle' | 'testing' | 'ok' | 'error'
 
 export function GeminiCard() {
-  const [apiKey, setApiKey] = useState('')
+  const storedApiKey = useSyncExternalStore(
+    subscribeToGeminiApiKey,
+    getGeminiApiKeySnapshot,
+    () => '',
+  )
+  const [editedApiKey, setEditedApiKey] = useState<string>()
+  const apiKey =
+    editedApiKey ?? (storedApiKey === INVALID_GEMINI_API_KEY_SNAPSHOT ? '' : storedApiKey)
   const [visible, setVisible] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
+  const [error, setError] = useState('')
+  const invalidStoredKey = storedApiKey === INVALID_GEMINI_API_KEY_SNAPSHOT
+  const isSaved = Boolean(storedApiKey && !invalidStoredKey && storedApiKey === apiKey)
+  const visibleError = invalidStoredKey
+    ? 'Nie udało się odczytać lokalnego klucza. Wprowadź go ponownie.'
+    : error
 
-  const test = () => {
-    if (!apiKey.trim()) return
+  const test = async () => {
     setStatus('testing')
-    setTimeout(() => setStatus('ok'), 1200)
+    setError('')
+    try {
+      const savedKey = saveGeminiApiKey(apiKey)
+      setEditedApiKey(savedKey)
+      await testGeminiConnection(savedKey)
+      setStatus('ok')
+    } catch (cause) {
+      setStatus('error')
+      setError(cause instanceof Error ? cause.message : 'Nie udało się przetestować połączenia z Gemini.')
+    }
+  }
+
+  const removeKey = () => {
+    try {
+      removeGeminiApiKey()
+      setEditedApiKey('')
+      setStatus('idle')
+      setError('')
+    } catch {
+      setStatus('error')
+      setError('Nie udało się usunąć klucza z lokalnej pamięci przeglądarki.')
+    }
   }
 
   return (
@@ -36,7 +77,17 @@ export function GeminiCard() {
             )}
           >
             <span className={cn('size-1.5 rounded-full', status === 'ok' ? 'bg-primary' : 'bg-muted-foreground')} aria-hidden="true" />
-            {status === 'ok' ? 'Połączono' : 'Nie skonfigurowano'}
+            {status === 'testing'
+              ? 'Sprawdzanie'
+              : status === 'ok'
+                ? 'Połączono'
+                : status === 'error'
+                  ? 'Błąd połączenia'
+                  : invalidStoredKey
+                    ? 'Błąd ustawień'
+                    : isSaved
+                    ? 'Klucz zapisany'
+                    : 'Nie skonfigurowano'}
           </span>
         </CardAction>
       </CardHeader>
@@ -49,8 +100,9 @@ export function GeminiCard() {
               type={visible ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => {
-                setApiKey(e.target.value)
+                setEditedApiKey(e.target.value)
                 setStatus('idle')
+                setError('')
               }}
               placeholder="AIza…"
               autoComplete="off"
@@ -67,13 +119,13 @@ export function GeminiCard() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Klucz wygenerujesz w Google AI Studio. Nigdy nie udostępniaj go innym osobom.
+            Klucz zostaje zapisany wyłącznie lokalnie w tej przeglądarce. Test połączenia wysyła go bezpośrednio do Google.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={test}
+          onClick={() => void test()}
           disabled={!apiKey.trim() || status === 'testing'}
           className="flex h-11 items-center justify-center gap-2 rounded-lg border border-border bg-secondary/50 text-sm font-medium transition-colors hover:bg-secondary disabled:opacity-50"
         >
@@ -81,6 +133,17 @@ export function GeminiCard() {
           {status === 'ok' && <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />}
           {status === 'testing' ? 'Sprawdzanie…' : status === 'ok' ? 'Połączenie działa' : 'Zapisz i przetestuj'}
         </button>
+        {isSaved && (
+          <button
+            type="button"
+            onClick={removeKey}
+            className="flex h-10 items-center justify-center gap-2 rounded-lg text-sm text-muted-foreground transition-colors hover:text-destructive"
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            Usuń zapisany klucz
+          </button>
+        )}
+        {visibleError && <p role="alert" className="text-sm text-destructive">{visibleError}</p>}
       </CardContent>
     </Card>
   )

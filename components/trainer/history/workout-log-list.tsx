@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { numberFormat, workoutTypeMeta, type WorkoutLog } from '@/lib/trainer-data'
+import { numberFormat, workoutTypeMeta } from '@/lib/format'
+import type { WorkoutLog } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
 const dayFormatter = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'short', weekday: 'short' })

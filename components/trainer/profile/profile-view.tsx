@@ -1,18 +1,203 @@
 'use client'
 
-import { useState } from 'react'
-import { weightHistory } from '@/lib/trainer-data'
+import { useEffect, useState } from 'react'
+import { getProfile, saveProfile } from '@/lib/repositories'
+import type { ProfileDocument } from '@/lib/schemas'
 import { BiometricsCard } from './biometrics-card'
 import { WeightHistoryCard } from './weight-history-card'
 import { GeminiCard } from './gemini-card'
 import { DriveSyncCard } from './drive-sync-card'
 
-export function ProfileView() {
-  const [weights, setWeights] = useState(weightHistory)
-  const currentWeight = weights.at(-1)!.weight
+const defaultProfileDocument: ProfileDocument = {
+  version: '1.0',
+  updated_at: '2026-10-14T18:30:00.000Z',
+  profile: {
+    gender: 'male',
+    age: 29,
+    height_cm: 182,
+    weight_history: [
+      { date: '2026-08-17', weight_kg: 85.1 },
+      { date: '2026-08-24', weight_kg: 84.8 },
+      { date: '2026-08-31', weight_kg: 84.6 },
+      { date: '2026-09-07', weight_kg: 84.1 },
+      { date: '2026-09-14', weight_kg: 83.9 },
+      { date: '2026-09-21', weight_kg: 83.4 },
+      { date: '2026-09-28', weight_kg: 83.2 },
+      { date: '2026-10-05', weight_kg: 82.8 },
+      { date: '2026-10-12', weight_kg: 82.4 },
+    ],
+    experience_level: 'intermediate',
+    primary_goal: 'hypertrophy',
+    injuries_notes: '',
+  },
+  exercise_preferences: {
+    excluded_exercise_ids: [],
+    favorite_exercise_ids: [],
+    custom_exercises: [],
+  },
+  settings: {
+    rest_timer_defaults: {
+      heavy_compound: 180,
+      moderate_compound: 120,
+      isolation: 60,
+    },
+  },
+}
 
-  const addWeight = (weight: number) =>
-    setWeights((list) => [...list, { date: 'Dziś', weight }].slice(-12))
+const genderLabels = {
+  male: 'Mężczyzna',
+  female: 'Kobieta',
+  other: 'Inna',
+} as const
+
+function formatDisplayDate(date: string) {
+  const parsed = new Date(`${date}T12:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) {
+    return date
+  }
+
+  return parsed.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
+}
+
+export function ProfileView() {
+  const [profile, setProfile] = useState<ProfileDocument>(defaultProfileDocument)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [error, setError] = useState('')
+
+  const loadProfile = async () => {
+    setStatus('loading')
+    setError('')
+
+    try {
+      const document = await getProfile()
+      setProfile(document ?? defaultProfileDocument)
+      setStatus('ready')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Nie udało się wczytać profilu.')
+      setStatus('error')
+    }
+  }
+
+  useEffect(() => {
+    let active = true
+
+    void getProfile().then((document) => {
+      if (!active) return
+      setProfile(document ?? defaultProfileDocument)
+      setStatus('ready')
+    }).catch((cause: unknown) => {
+      if (!active) return
+      setError(cause instanceof Error ? cause.message : 'Nie udało się wczytać profilu.')
+      setStatus('error')
+    })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (status !== 'ready') return
+
+    void saveProfile({
+      ...profile,
+      updated_at: new Date().toISOString(),
+    }).catch((cause) => {
+      console.error('Nie udało się zapisać profilu.', cause)
+    })
+  }, [profile, status])
+
+  const currentWeight = profile.profile.weight_history.at(-1)?.weight_kg ?? 0
+  const weights = profile.profile.weight_history.map((entry) => ({
+    date: formatDisplayDate(entry.date),
+    weight: Number(entry.weight_kg.toFixed(1)),
+  }))
+
+  const addWeight = (weight: number) => {
+    setProfile((current) => {
+      const nextHistory = [
+        ...current.profile.weight_history,
+        {
+          date: new Date().toISOString().slice(0, 10),
+          weight_kg: Number(weight.toFixed(1)),
+        },
+      ].slice(-12)
+
+      return {
+        ...current,
+        updated_at: new Date().toISOString(),
+        profile: {
+          ...current.profile,
+          weight_history: nextHistory,
+        },
+      }
+    })
+  }
+
+  const handleGenderChange = (gender: keyof typeof genderLabels) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      profile: {
+        ...current.profile,
+        gender,
+      },
+    }))
+  }
+
+  const handleAgeChange = (age: number) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      profile: {
+        ...current.profile,
+        age: Number.isFinite(age) ? Math.min(Math.max(age, 13), 120) : current.profile.age,
+      },
+    }))
+  }
+
+  const handleHeightChange = (height: number) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      profile: {
+        ...current.profile,
+        height_cm: Number.isFinite(height) ? Math.min(Math.max(height, 1), 300) : current.profile.height_cm,
+      },
+    }))
+  }
+
+  if (status === 'loading') {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Profil i ustawienia</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja z Gemini i synchronizacja.</p>
+        </div>
+        <p role="status" className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          Wczytywanie profilu…
+        </p>
+      </div>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Profil i ustawienia</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja z Gemini i synchronizacja.</p>
+        </div>
+        <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <p className="font-medium">Nie udało się wczytać profilu.</p>
+          <p className="mt-1">{error}</p>
+          <button type="button" onClick={() => void loadProfile()} className="mt-3 underline underline-offset-2">
+            Spróbuj ponownie
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -23,7 +208,15 @@ export function ProfileView() {
 
       <div className="grid items-start gap-4 lg:grid-cols-2 lg:gap-6">
         <div className="flex flex-col gap-4">
-          <BiometricsCard weight={currentWeight} />
+          <BiometricsCard
+            gender={genderLabels[profile.profile.gender]}
+            age={profile.profile.age}
+            height={profile.profile.height_cm}
+            weight={currentWeight}
+            onGenderChange={(value) => handleGenderChange(Object.entries(genderLabels).find(([, label]) => label === value)?.[0] as keyof typeof genderLabels ?? 'male')}
+            onAgeChange={handleAgeChange}
+            onHeightChange={handleHeightChange}
+          />
           <GeminiCard />
         </div>
         <div className="flex flex-col gap-4">

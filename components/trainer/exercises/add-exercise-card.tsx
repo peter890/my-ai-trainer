@@ -5,25 +5,34 @@ import { Plus } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { muscleGroups, type Exercise, type MuscleGroup } from '@/lib/trainer-data'
+import type { RestType } from '@/lib/schemas'
+import type { ExerciseDraft, EquipmentLabel } from '@/lib/exercise-catalog'
+import { muscleGroups, type MuscleGroup } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
-const equipmentOptions = ['Sztanga', 'Hantle', 'Wyciąg', 'Maszyna', 'Masa ciała', 'Kettlebell']
+const equipmentOptions: EquipmentLabel[] = ['Sztanga', 'Hantle', 'Wyciąg', 'Maszyna', 'Kalistenika', 'Kardio']
+const restOptions: { value: RestType; label: string }[] = [
+  { value: 'heavy_compound', label: 'Ciężkie' },
+  { value: 'moderate_compound', label: 'Złożone' },
+  { value: 'isolation', label: 'Izolowane' },
+  { value: 'cardio', label: 'Kardio' },
+]
 
 type Props = {
-  onAdd: (exercise: Pick<Exercise, 'name' | 'muscle' | 'equipment'>) => void
+  onAdd: (exercise: Omit<ExerciseDraft, 'id'>) => void
 }
 
 export function AddExerciseCard({ onAdd }: Props) {
   const [name, setName] = useState('')
   const [muscle, setMuscle] = useState<MuscleGroup>('Klatka')
-  const [equipment, setEquipment] = useState('Hantle')
+  const [equipment, setEquipment] = useState<EquipmentLabel>('Hantle')
+  const [restType, setRestType] = useState<RestType>('moderate_compound')
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    onAdd({ name: trimmed.slice(0, 60), muscle, equipment })
+    onAdd({ name: trimmed.slice(0, 60), muscle, equipment, rest_type: restType })
     setName('')
   }
 
@@ -50,6 +59,27 @@ export function AddExerciseCard({ onAdd }: Props) {
 
           <Chips label="Partia mięśniowa" options={muscleGroups} value={muscle} onChange={setMuscle} />
           <Chips label="Sprzęt" options={equipmentOptions} value={equipment} onChange={setEquipment} />
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium">Typ przerwy</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {restOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setRestType(option.value)}
+                  aria-pressed={restType === option.value}
+                  className={cn(
+                    'h-8 rounded-full border px-3 text-xs font-medium transition-colors',
+                    restType === option.value
+                      ? 'border-primary bg-primary/15 text-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
           <button
             type="submit"

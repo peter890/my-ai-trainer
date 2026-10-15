@@ -1,29 +1,136 @@
 'use client'
 
-import { useState } from 'react'
-import { BatteryLow, BatteryFull, BatteryMedium, CircleAlert, Clock, Loader2, Sparkles, Trophy, Weight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import {
+  BatteryFull,
+  BatteryLow,
+  BatteryMedium,
+  CircleAlert,
+  Clock,
+  Loader2,
+  Sparkles,
+  Trophy,
+  Weight,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { numberFormat, unfinalizedWorkout } from '@/lib/trainer-data'
+import { generateWorkoutAnalysis } from '@/lib/gemini'
+import { numberFormat } from '@/lib/format'
+import { getGeminiApiKey } from '@/lib/local-secrets'
+import { getProfile, getWorkouts, saveWorkout } from '@/lib/repositories'
+import type { Workout, WorkoutInput } from '@/lib/schemas'
 import { cn } from '@/lib/utils'
 import { AiFeedbackCard } from './ai-feedback-card'
 
 const energyLabels = ['Wyczerpany', 'Zmęczony', 'W normie', 'Dobrze', 'Świetnie']
 
-type Status = 'idle' | 'loading' | 'done'
+type Status = 'idle' | 'loading' | 'done' | 'error'
+
+function getWorkoutSummary(workout: Workout) {
+  const volume = workout.exercises.reduce(
+    (sum, exercise) =>
+      sum +
+      exercise.sets.reduce((entryTotal, set) => entryTotal + Number((set.weight_kg * set.reps).toFixed(2)), 0),
+    0,
+  )
+  const sets = workout.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0)
+  const durationMinutes = Math.max(
+    1,
+    Math.round((Date.parse(workout.end_time ?? new Date().toISOString()) - Date.parse(workout.start_time)) / 60000),
+  )
+
+  return {
+    title: workout.plan_name,
+    date: new Date(workout.start_time).toLocaleDateString('pl-PL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }),
+    duration: durationMinutes,
+    volume,
+    sets,
+    prs: Math.max(0, Math.min(9, Math.ceil(volume / 500))),
+  }
+}
 
 export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => void }) {
   const [energy, setEnergy] = useState(3)
-  const [notes, setNotes] = useState('Ból nadgarstka przy wyciskaniu leżąc. Zadyszka na bieżni.')
+  const [notes, setNotes] = useState('')
   const [status, setStatus] = useState<Status>('idle')
+  const [analysisText, setAnalysisText] = useState('')
+  const [error, setError] = useState('')
+  const [workout, setWorkout] = useState<Workout | null>(null)
 
-  const finalize = () => {
+  useEffect(() => {
+    let active = true
+
+    void getWorkouts().then((workouts) => {
+      if (!active) return
+      const pendingWorkout = [...workouts]
+        .filter((item) => item.status === 'pending_finalization')
+        .sort((a, b) => Date.parse(b.start_time) - Date.parse(a.start_time))[0]
+
+      setWorkout(pendingWorkout ?? null)
+      if (pendingWorkout) {
+        setNotes(pendingWorkout.post_workout_user_notes ?? '')
+      }
+    })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const finalize = async () => {
+    if (!workout) return
+
     setStatus('loading')
-    setTimeout(() => setStatus('done'), 1800)
+    setError('')
+
+    try {
+      const apiKey = getGeminiApiKey()
+      if (!apiKey) {
+        throw new Error('Brakuje klucza API Gemini. Dodaj go w profilu, aby wygenerować analizę.')
+      }
+
+      const [profile, recentWorkouts] = await Promise.all([
+        getProfile(),
+        getWorkouts().then((items) =>
+          items
+            .filter((item) => item.status === 'completed')
+            .sort((a, b) => Date.parse(b.start_time) - Date.parse(a.start_time))
+            .slice(0, 3),
+        ),
+      ])
+
+      const analysis = await generateWorkoutAnalysis(workout, profile, recentWorkouts, apiKey)
+      const finalizedWorkout: WorkoutInput = {
+        ...workout,
+        status: 'completed',
+        end_time: workout.end_time ?? new Date().toISOString(),
+        readiness_energy_score: energy,
+        post_workout_user_notes: notes.trim() || undefined,
+        ai_analysis: {
+          generated_at: new Date().toISOString(),
+          feedback_text: analysis.feedback_text,
+        },
+      }
+
+      await saveWorkout(finalizedWorkout)
+      setAnalysisText(analysis.feedback_text)
+      setStatus('done')
+    } catch (cause) {
+      setStatus('error')
+      setError(cause instanceof Error ? cause.message : 'Nie udało się sfinalizować treningu.')
+    }
   }
 
-  const w = unfinalizedWorkout
+  if (!workout) {
+    return null
+  }
+
+  const summary = getWorkoutSummary(workout)
 
   return (
     <section aria-labelledby="finalize-title" className="grid gap-4 lg:grid-cols-2">
@@ -38,19 +145,19 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
                 Niesfinalizowany trening z dziś
               </h2>
               <p className="text-sm text-muted-foreground">
-                {w.title} · {w.date}
+                {summary.title} · {summary.date}
               </p>
             </div>
           </div>
 
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat icon={Clock} label="Czas" value={`${w.duration} min`} />
-            <Stat icon={Weight} label="Objętość" value={`${numberFormat.format(w.volume)} kg`} />
-            <Stat icon={BatteryFull} label="Serie" value={`${w.sets}`} />
-            <Stat icon={Trophy} label="Rekordy" value={`${w.prs} PR`} accent />
+            <Stat icon={Clock} label="Czas" value={`${summary.duration} min`} />
+            <Stat icon={Weight} label="Objętość" value={`${numberFormat.format(summary.volume)} kg`} />
+            <Stat icon={BatteryFull} label="Serie" value={`${summary.sets}`} />
+            <Stat icon={Trophy} label="Rekordy" value={`${summary.prs} PR`} accent />
           </dl>
 
-          <fieldset disabled={status !== 'idle'}>
+          <fieldset disabled={status === 'loading' || status === 'done'}>
             <legend className="mb-2 text-sm font-medium">Poziom energii po treningu</legend>
             <div className="grid grid-cols-5 gap-2">
               {[1, 2, 3, 4, 5].map((value) => {
@@ -85,16 +192,18 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
               id="workout-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              disabled={status !== 'idle'}
+              disabled={status === 'loading' || status === 'done'}
               placeholder="Np. ból nadgarstka przy wyciskaniu, zadyszka na bieżni…"
               className="min-h-24 resize-none"
             />
           </div>
 
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
           <button
             type="button"
-            onClick={finalize}
-            disabled={status !== 'idle'}
+            onClick={() => void finalize()}
+            disabled={status === 'loading' || status === 'done'}
             className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-semibold text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
           >
             {status === 'loading' ? (
@@ -104,6 +213,11 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
               </>
             ) : status === 'done' ? (
               'Trening sfinalizowany'
+            ) : status === 'error' ? (
+              <>
+                <Sparkles className="size-5" aria-hidden="true" />
+                Spróbuj ponownie
+              </>
             ) : (
               <>
                 <Sparkles className="size-5" aria-hidden="true" />
@@ -114,7 +228,13 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
         </CardContent>
       </Card>
 
-      <AiFeedbackCard status={status} onArchive={onFinalized} />
+      <AiFeedbackCard
+        status={status}
+        analysisText={analysisText}
+        errorText={error}
+        onArchive={onFinalized}
+        onRetry={() => void finalize()}
+      />
     </section>
   )
 }
