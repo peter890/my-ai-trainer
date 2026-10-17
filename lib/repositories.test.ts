@@ -3,17 +3,21 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { openDatabase } from './database'
 import {
   deleteExercise,
+  deleteLiveSessionSnapshot,
   deletePlan,
   deleteWorkout,
   getExercises,
   getExercisePreferences,
+  getLiveSessionSnapshot,
   getPlans,
   getProfile,
   getWorkout,
   getWorkouts,
   saveExercise,
   saveExercisePreferences,
+  saveLiveSessionSnapshot,
   savePlan,
+  savePlans,
   saveProfile,
   saveWorkout,
 } from './repositories'
@@ -92,6 +96,58 @@ afterEach(() => {
 })
 
 describe('IndexedDB repositories', () => {
+  it('validates and persists profile edits and weight history', async () => {
+    const database = await createTestDatabase()
+    openDatabases.push(database)
+
+    await expect(
+      saveProfile(
+        {
+          ...profile,
+          profile: { ...profile.profile, age: 12 },
+        },
+        database,
+      ),
+    ).rejects.toThrow()
+    await expect(getProfile(database)).resolves.toBeUndefined()
+
+    const updatedProfile = {
+      ...profile,
+      updated_at: '2026-10-16T12:00:00.000Z',
+      profile: {
+        ...profile.profile,
+        age: 31,
+        experience_level: 'advanced' as const,
+        primary_goal: 'endurance' as const,
+        injuries_notes: 'Ograniczyć obciążenie prawego kolana.',
+        weight_history: [{ date: '2026-10-16', weight_kg: 80.5 }],
+      },
+    }
+    await saveProfile(updatedProfile, database)
+    await expect(getProfile(database)).resolves.toMatchObject({
+      profile: {
+        age: 31,
+        experience_level: 'advanced',
+        primary_goal: 'endurance',
+        injuries_notes: 'Ograniczyć obciążenie prawego kolana.',
+        weight_history: [{ date: '2026-10-16', weight_kg: 80.5 }],
+      },
+    })
+
+    await expect(
+      saveProfile(
+        {
+          ...updatedProfile,
+          profile: {
+            ...updatedProfile.profile,
+            weight_history: [{ date: '2026-10-16', weight_kg: -1 }],
+          },
+        },
+        database,
+      ),
+    ).rejects.toThrow()
+  })
+
   it('persists profile, exercise, plan and workout data and supports empty collections/deletes', async () => {
     const database = await createTestDatabase()
     openDatabases.push(database)
@@ -102,13 +158,23 @@ describe('IndexedDB repositories', () => {
     })
 
     await expect(getExercises(database)).resolves.toEqual([])
-    await expect(getExercisePreferences(database)).resolves.toEqual({
+    await expect(getExercisePreferences(database)).resolves.toMatchObject({
       excluded_exercise_ids: [],
       favorite_exercise_ids: [],
+      updated_at: expect.any(String),
     })
     await saveExercise(exercise, database)
     await expect(getExercises(database)).resolves.toMatchObject([
-      { id: 'bench-press', technique_note: '', custom: false },
+      { id: 'bench-press', active: true, technique_note: '', custom: false },
+    ])
+    await saveExercise({ ...exercise, active: false }, database)
+    await expect(getExercises(database)).resolves.toMatchObject([{ id: 'bench-press', active: false }])
+    await saveExercise(
+      { ...exercise, active: false, technique_note: 'Zatrzymaj ruch przed przeprostem.' },
+      database,
+    )
+    await expect(getExercises(database)).resolves.toMatchObject([
+      { id: 'bench-press', technique_note: 'Zatrzymaj ruch przed przeprostem.' },
     ])
     await deleteExercise('bench-press', database)
     await expect(getExercises(database)).resolves.toEqual([])
@@ -123,6 +189,21 @@ describe('IndexedDB repositories', () => {
     await expect(getPlans(database)).resolves.toEqual([])
     await savePlan(plan, database)
     await expect(getPlans(database)).resolves.toMatchObject([{ id: 'push-a' }])
+    await savePlan(
+      {
+        ...plan,
+        name: 'Push A edited',
+        exercises: [{ ...plan.exercises[0], target_sets: 4, target_reps: '6-8' }],
+      },
+      database,
+    )
+    await expect(getPlans(database)).resolves.toMatchObject([
+      {
+        id: 'push-a',
+        name: 'Push A edited',
+        exercises: [{ target_sets: 4, target_reps: '6-8' }],
+      },
+    ])
     await deletePlan('push-a', database)
     await expect(getPlans(database)).resolves.toEqual([])
 
@@ -136,8 +217,44 @@ describe('IndexedDB repositories', () => {
     await deleteWorkout('workout-1', database)
     await expect(getWorkouts(database)).resolves.toHaveLength(1)
 
+    const liveSnapshot = {
+      workout_id: 'live-workout-1',
+      plan_id: 'push-a',
+      exercise_ids: ['bench-press'],
+      exercise_index: 0,
+      draft: { weight: '', reps: '8', rir: 2 },
+      paused: true,
+      elapsed_ms: 120_000,
+      rest_remaining_ms: 30_000,
+      rest_total_ms: 90_000,
+      updated_at: '2026-10-16T12:00:00.000Z',
+    }
+    await saveLiveSessionSnapshot(liveSnapshot, database)
+    await expect(getLiveSessionSnapshot(database)).resolves.toEqual(liveSnapshot)
+    await expect(
+      saveLiveSessionSnapshot({ ...liveSnapshot, exercise_index: 1 }, database),
+    ).rejects.toThrow()
+    await deleteLiveSessionSnapshot(database)
+    await expect(getLiveSessionSnapshot(database)).resolves.toBeUndefined()
+
     await expect(saveWorkout({ ...workout, id: '', status: 'in_progress', end_time: undefined }, database)).rejects.toThrow()
     await expect(deleteWorkout('', database)).rejects.toThrow()
+  })
+
+  it('validates a generated plan batch before atomically storing it', async () => {
+    const database = await createTestDatabase()
+    openDatabases.push(database)
+
+    await expect(savePlans([plan, { ...plan, id: '' }], database)).rejects.toThrow()
+    await expect(getPlans(database)).resolves.toEqual([])
+
+    await savePlans([{ ...plan, id: 'push-a' }, { ...plan, id: 'pull-a', type: 'pull' }], database)
+    await expect(getPlans(database)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'push-a', type: 'push' }),
+        expect.objectContaining({ id: 'pull-a', type: 'pull' }),
+      ]),
+    )
   })
 
   it('validates data read from IndexedDB instead of returning corrupted records', async () => {
@@ -173,7 +290,7 @@ describe('IndexedDB repositories', () => {
     })
   })
 
-  it('upgrades an existing database by adding exercise preferences', async () => {
+  it('upgrades an existing database with preferences and local live-session storage', async () => {
     const name = `ai-trainer-v1-test-${databaseName++}`
     const oldDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(name, 1)
@@ -192,7 +309,111 @@ describe('IndexedDB repositories', () => {
     const upgradedDatabase = await openDatabase(name)
     openDatabases.push(upgradedDatabase)
 
-    expect(upgradedDatabase.version).toBe(2)
+    expect(upgradedDatabase.version).toBe(5)
     expect(upgradedDatabase.objectStoreNames.contains('exercise_preferences')).toBe(true)
+    expect(upgradedDatabase.objectStoreNames.contains('live_session')).toBe(true)
+  })
+
+  it('adds updated_at timestamps to existing records during the version 3 migration', async () => {
+    const name = `ai-trainer-v2-migration-test-${databaseName++}`
+    const oldDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 2)
+      request.onupgradeneeded = () => {
+        const database = request.result
+        database.createObjectStore('profile')
+        database.createObjectStore('exercises', { keyPath: 'id' })
+        database.createObjectStore('exercise_preferences')
+        database.createObjectStore('plans', { keyPath: 'id' })
+        database.createObjectStore('workouts', { keyPath: 'id' })
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const transaction = oldDatabase.transaction(
+      ['exercises', 'exercise_preferences', 'workouts'],
+      'readwrite',
+    )
+    transaction.objectStore('exercises').put({
+      id: 'legacy-exercise',
+      name: 'Legacy exercise',
+      category: 'chest',
+      equipment: 'barbell',
+      rest_type: 'heavy_compound',
+      technique_note: '',
+      custom: false,
+    })
+    transaction.objectStore('exercise_preferences').put(
+      { excluded_exercise_ids: [], favorite_exercise_ids: [] },
+      'current',
+    )
+    transaction.objectStore('workouts').put({
+      id: 'legacy-workout',
+      start_time: '2026-10-14T18:30:00.000Z',
+      status: 'in_progress',
+      plan_name: 'Legacy plan',
+      exercises: [],
+    })
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+    })
+    oldDatabase.close()
+
+    const upgradedDatabase = await openDatabase(name)
+    openDatabases.push(upgradedDatabase)
+    const [exercise, preferences, workout] = await Promise.all([
+      upgradedDatabase.get('exercises', 'legacy-exercise'),
+      upgradedDatabase.get('exercise_preferences', 'current'),
+      upgradedDatabase.get('workouts', 'legacy-workout'),
+    ])
+
+    expect(exercise?.updated_at).toEqual(expect.any(String))
+    expect(preferences?.updated_at).toEqual(expect.any(String))
+    expect(workout?.updated_at).toEqual(expect.any(String))
+  })
+
+  it('defaults existing exercises to active during the version 4 migration', async () => {
+    const name = `ai-trainer-v3-activity-migration-test-${databaseName++}`
+    const oldDatabase = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 3)
+      request.onupgradeneeded = () => {
+        const database = request.result
+        database.createObjectStore('profile')
+        database.createObjectStore('exercises', { keyPath: 'id' })
+        database.createObjectStore('exercise_preferences')
+        database.createObjectStore('plans', { keyPath: 'id' })
+        database.createObjectStore('workouts', { keyPath: 'id' })
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const transaction = oldDatabase.transaction('exercises', 'readwrite')
+    const legacyExercise = {
+      id: 'legacy-active',
+      updated_at: '2026-10-14T18:30:00.000Z',
+      name: 'Legacy active',
+      category: 'chest',
+      equipment: 'barbell',
+      rest_type: 'heavy_compound',
+      technique_note: '',
+      custom: false,
+    }
+    transaction.objectStore('exercises').put(legacyExercise)
+    transaction.objectStore('exercises').put({ ...legacyExercise, id: 'legacy-inactive', active: false })
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+    })
+    oldDatabase.close()
+
+    const upgradedDatabase = await openDatabase(name)
+    openDatabases.push(upgradedDatabase)
+    const [active, inactive] = await Promise.all([
+      upgradedDatabase.get('exercises', 'legacy-active'),
+      upgradedDatabase.get('exercises', 'legacy-inactive'),
+    ])
+
+    expect(active?.active).toBe(true)
+    expect(inactive?.active).toBe(false)
   })
 })

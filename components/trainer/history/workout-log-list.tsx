@@ -4,15 +4,20 @@ import { numberFormat, workoutTypeMeta } from '@/lib/format'
 import type { WorkoutLog } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
-const dayFormatter = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'short', weekday: 'short' })
+const dayFormatter = new Intl.DateTimeFormat('pl-PL', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  weekday: 'short',
+})
 
 type Props = {
   logs: WorkoutLog[]
-  selected: string
-  onSelect: (date: string) => void
+  selectedId: string
+  onSelect: (log: WorkoutLog) => void
 }
 
-export function WorkoutLogList({ logs, selected, onSelect }: Props) {
+export function WorkoutLogList({ logs, selectedId, onSelect }: Props) {
   return (
     <Card>
       <CardHeader>
@@ -26,21 +31,21 @@ export function WorkoutLogList({ logs, selected, onSelect }: Props) {
         ) : (
           <ul className="flex flex-col gap-1">
             {logs.map((log) => (
-              <li key={log.date}>
+              <li key={log.id}>
                 <button
                   type="button"
-                  onClick={() => onSelect(log.date)}
-                  aria-current={log.date === selected ? 'true' : undefined}
+                  onClick={() => onSelect(log)}
+                  aria-current={log.id === selectedId ? 'true' : undefined}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors',
-                    log.date === selected ? 'bg-secondary' : 'hover:bg-secondary/50',
+                    log.id === selectedId ? 'bg-secondary' : 'hover:bg-secondary/50',
                   )}
                 >
                   <span className={cn('h-9 w-1 shrink-0 rounded-full', workoutTypeMeta[log.type].dot)} aria-hidden="true" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{log.title}</span>
                     <span className="block text-xs text-muted-foreground first-letter:uppercase">
-                      {dayFormatter.format(new Date(`${log.date}T12:00:00`))} · {log.duration} min
+                      {dayFormatter.format(new Date(`${log.date}T12:00:00`))} · {log.time} · {log.duration} min
                     </span>
                   </span>
                   <span className="text-right text-xs text-muted-foreground tabular-nums">

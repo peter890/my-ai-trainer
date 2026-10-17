@@ -1,4 +1,5 @@
 import {z} from 'zod'
+import { ProfileDocumentSchema, WorkoutSchema } from './schemas'
 
 export const GoogleDriveSyncStatusSchema = z.enum(['idle', 'connecting', 'connected', 'error'])
 export type GoogleDriveSyncStatus = z.infer<typeof GoogleDriveSyncStatusSchema>
@@ -14,6 +15,27 @@ export const GoogleDriveFileSchema = z
 
 export type GoogleDriveFile = z.infer<typeof GoogleDriveFileSchema>
 
+const DriveReplicaProfileSchema = z
+  .object({
+    version: z.literal('1.0'),
+    updated_at: z.string().datetime(),
+    data: ProfileDocumentSchema,
+  })
+  .strict()
+
+const DriveReplicaWorkoutsSchema = z
+  .object({
+    version: z.literal('1.0'),
+    updated_at: z.string().datetime(),
+    data: z.array(WorkoutSchema),
+  })
+  .strict()
+
+type DriveReplicaSyncResult = {
+  status: 'synced' | 'conflict' | 'skipped'
+  message: string
+}
+
 export const GOOGLE_DRIVE_FILE_NAMES = {
   profile: 'user_profile.json',
   workouts: 'workouts_history.json',
@@ -22,6 +44,7 @@ export const GOOGLE_DRIVE_FILE_NAMES = {
 const GOOGLE_OAUTH_SCRIPT_URL = 'https://accounts.google.com/gsi/client'
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const DRIVE_TOKEN_EVENT = 'ai-trainer:drive-token-changed'
+const DRIVE_QUEUE_EVENT = 'ai-trainer:drive-queue-changed'
 export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = 'ai-trainer.drive.access-token'
 const GOOGLE_DRIVE_TOKEN_EXPIRY_BUFFER_MS = 60_000
 
@@ -87,6 +110,17 @@ export function subscribeToGoogleDriveToken(onChange: () => void): () => void {
   if (typeof window === 'undefined') return () => {}
   window.addEventListener(DRIVE_TOKEN_EVENT, onChange)
   return () => window.removeEventListener(DRIVE_TOKEN_EVENT, onChange)
+}
+
+export function subscribeToDriveSyncQueue(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(DRIVE_QUEUE_EVENT, onChange)
+  return () => window.removeEventListener(DRIVE_QUEUE_EVENT, onChange)
+}
+
+function notifyDriveSyncQueueChanged(storage?: Storage): void {
+  if (typeof window === 'undefined' || (storage && storage !== window.localStorage)) return
+  window.dispatchEvent(new Event(DRIVE_QUEUE_EVENT))
 }
 
 async function ensureGoogleScriptLoaded(): Promise<void> {
@@ -156,13 +190,6 @@ export async function connectGoogleDrive(): Promise<string> {
   accessToken = persistedToken.access_token
   refreshGoogleDriveTokenState()
   return accessToken
-}
-
-export async function restoreGoogleDriveConnection(): Promise<boolean> {
-  ensureBrowser()
-
-  accessToken = readPersistedGoogleDriveToken()
-  return accessToken !== null
 }
 
 function requestGoogleDriveToken(
@@ -258,17 +285,27 @@ export async function listGoogleDriveAppDataFiles(): Promise<GoogleDriveFile[]> 
   return z.array(GoogleDriveFileSchema).parse(Array.isArray(payload.files) ? payload.files : [])
 }
 
+function getNewestDriveFile(files: GoogleDriveFile[], fileName: string): GoogleDriveFile | undefined {
+  return files
+    .filter((file) => file.name === fileName)
+    .sort((left, right) => Date.parse(right.modifiedTime ?? '') - Date.parse(left.modifiedTime ?? ''))[0]
+}
+
 export async function readGoogleDriveJsonFile(fileName: string): Promise<unknown> {
   const files = await listGoogleDriveAppDataFiles()
-  const file = files.find((entry) => entry.name === fileName)
+  const file = getNewestDriveFile(files, fileName)
   if (!file) {
     return undefined
   }
 
+  return readDriveFileJson(file)
+}
+
+async function readDriveFileJson(file: GoogleDriveFile): Promise<unknown> {
   const response = await fetchDriveResource(`/drive/v3/files/${encodeURIComponent(file.id)}?alt=media`)
   if (!response.ok) {
     const detail = await response.text().catch(() => '')
-    throw new Error(detail || `Nie udało się odczytać pliku ${fileName} z Google Drive.`)
+    throw new Error(detail || `Nie udało się odczytać pliku ${file.name} z Google Drive.`)
   }
 
   const text = await response.text()
@@ -279,16 +316,43 @@ export async function readGoogleDriveJsonFile(fileName: string): Promise<unknown
   try {
     return JSON.parse(text)
   } catch {
-    throw new Error(`Plik ${fileName} nie zawiera poprawnego JSON.`)
+    throw new Error(`Plik ${file.name} nie zawiera poprawnego JSON.`)
   }
 }
 
-export async function writeGoogleDriveJsonFile(fileName: string, value: unknown): Promise<GoogleDriveFile> {
-  if (!accessToken) {
+export async function writeGoogleDriveJsonFile(
+  fileName: string,
+  value: unknown,
+  existingFile?: GoogleDriveFile,
+): Promise<GoogleDriveFile> {
+  const token = getGoogleDriveAccessToken()
+  if (!token) {
     throw new Error('Brak aktywnego połączenia z Google Drive.')
   }
 
   const payload = JSON.stringify(value, null, 2)
+  if (existingFile) {
+    const response = await fetchDriveResource(`/upload/drive/v3/files/${encodeURIComponent(existingFile.id)}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: payload,
+    })
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '')
+      throw new Error(details || `Nie udało się zaktualizować pliku ${fileName} w Google Drive.`)
+    }
+
+    const result = await response.json()
+    return GoogleDriveFileSchema.parse({
+      ...existingFile,
+      ...result,
+      id: result.id ?? existingFile.id,
+      name: result.name ?? fileName,
+      mimeType: result.mimeType ?? 'application/json',
+    })
+  }
+
   const boundary = 'ai-trainer-drive-upload-boundary'
   const metadata = JSON.stringify({ name: fileName, mimeType: 'application/json', parents: ['appDataFolder'] })
   const multipartBody = [
@@ -333,7 +397,7 @@ export function createDriveSyncSummary(): string {
   if (isGoogleDriveConnected()) {
     return 'Google Drive jest połączone i gotowe do synchronizacji.'
   }
-  return 'Google Drive jest gotowe do połączenia. Po autoryzacji sesja będzie pamiętana do wygaśnięcia tokena.'
+  return 'Google Drive jest rozłączone. Kliknij „Połącz z Google Drive”, aby rozpocząć logowanie.'
 }
 
 export const DRIVE_SYNC_QUEUE_STORAGE_KEY = 'ai-trainer.drive-sync.queue'
@@ -364,18 +428,21 @@ export function readDriveSyncQueue(storage?: Storage): DriveSyncQueueEntry[] {
   const rawValue = resolvedStorage.getItem(DRIVE_SYNC_QUEUE_STORAGE_KEY)
   if (!rawValue) return []
 
+  let parsed: unknown
   try {
-    const parsed = JSON.parse(rawValue)
-    return z.array(DriveSyncQueueEntrySchema).parse(parsed)
+    parsed = JSON.parse(rawValue)
   } catch {
-    return []
+    throw new Error('Kolejka synchronizacji Google Drive jest uszkodzona. Nie została wyczyszczona.')
   }
+
+  return z.array(DriveSyncQueueEntrySchema).parse(parsed)
 }
 
 export function writeDriveSyncQueue(entries: DriveSyncQueueEntry[], storage?: Storage): void {
   const resolvedStorage = resolveStorage(storage)
   if (!resolvedStorage) return
-  resolvedStorage.setItem(DRIVE_SYNC_QUEUE_STORAGE_KEY, JSON.stringify(entries))
+  resolvedStorage.setItem(DRIVE_SYNC_QUEUE_STORAGE_KEY, JSON.stringify(z.array(DriveSyncQueueEntrySchema).parse(entries)))
+  notifyDriveSyncQueueChanged(storage)
 }
 
 export function enqueueDriveSync(
@@ -402,6 +469,7 @@ export function clearDriveSyncQueue(storage?: Storage): void {
   const resolvedStorage = resolveStorage(storage)
   if (!resolvedStorage) return
   resolvedStorage.removeItem(DRIVE_SYNC_QUEUE_STORAGE_KEY)
+  notifyDriveSyncQueueChanged(storage)
 }
 
 export function getDriveSyncQueueLength(storage?: Storage): number {
@@ -421,65 +489,126 @@ export function compareDriveTimestamps(localTimestamp?: string, remoteTimestamp?
   return 'equal'
 }
 
-function getUpdatedAt(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object') return undefined
-
-  const candidate = value as Record<string, unknown>
-  if (typeof candidate.updated_at === 'string') return candidate.updated_at
-  if (Array.isArray(candidate)) {
-    return candidate
-        .map((entry) => getUpdatedAt(entry))
-        .filter((timestamp): timestamp is string => typeof timestamp === 'string')
-        .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
-  }
-
-  if ('profile' in candidate && candidate.profile && typeof candidate.profile === 'object') {
-    const profile = candidate.profile as Record<string, unknown>
-    if (typeof profile.updated_at === 'string') return profile.updated_at
-  }
-
-  return undefined
+type RemoteReplica<T> = {
+  data: T
+  updatedAt?: string
+  file: GoogleDriveFile
 }
 
-export async function syncDriveReplica(localProfile: unknown, localWorkouts: unknown): Promise<{
-  status: 'synced' | 'conflict' | 'skipped'
-  message: string
-}> {
+async function readRemoteReplica<T>(
+  file: GoogleDriveFile | undefined,
+  schema: z.ZodType<T>,
+  envelopeSchema: z.ZodType<{ version: '1.0'; updated_at: string; data: T }>,
+): Promise<RemoteReplica<T> | undefined> {
+  if (!file) return undefined
+  const value = await readDriveFileJson(file)
+  const envelope = envelopeSchema.safeParse(value)
+  if (envelope.success) {
+    return { data: envelope.data.data, updatedAt: envelope.data.updated_at, file }
+  }
+
+  return { data: schema.parse(value), updatedAt: file.modifiedTime, file }
+}
+
+function areReplicaValuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+async function syncReplicaEntity<T>(
+  entity: DriveSyncQueueEntry['entity'],
+  fileName: string,
+  localValue: unknown,
+  schema: z.ZodType<T>,
+  envelopeSchema: z.ZodType<{ version: '1.0'; updated_at: string; data: T }>,
+  files: GoogleDriveFile[],
+  queue: DriveSyncQueueEntry[],
+): Promise<DriveReplicaSyncResult> {
+  const remoteFile = getNewestDriveFile(files, fileName)
+  const remote = await readRemoteReplica(remoteFile, schema, envelopeSchema)
+  const local = localValue === undefined ? undefined : schema.parse(localValue)
+  const pendingEntry = queue.find((entry) => entry.entity === entity)
+
+  if (local === undefined) {
+    return remote
+      ? {
+          status: 'conflict',
+          message: `Konflikt ${entity}: istnieją dane w Google Drive, ale brak ich lokalnie. Zaimportuj kopię przed synchronizacją.`,
+        }
+      : { status: 'synced', message: '' }
+  }
+
+  if (!remote) {
+    await writeGoogleDriveJsonFile(fileName, {
+      version: '1.0',
+      updated_at: pendingEntry?.timestamp ?? new Date().toISOString(),
+      data: local,
+    })
+    return { status: 'synced', message: '' }
+  }
+
+  if (areReplicaValuesEqual(local, remote.data)) {
+    return { status: 'synced', message: '' }
+  }
+
+  if (!pendingEntry) {
+    return {
+      status: 'conflict',
+      message: `Konflikt ${entity}: dane lokalne i z Google Drive różnią się. Lokalna kolejka jest pusta, więc nic nie zostało nadpisane.`,
+    }
+  }
+
+  if (compareDriveTimestamps(pendingEntry.timestamp, remote.updatedAt) !== 'local') {
+    return {
+      status: 'conflict',
+      message: `Konflikt ${entity}: wersja Google Drive jest nowsza lub nie ma wiarygodnego czasu. Lokalna kolejka została zachowana.`,
+    }
+  }
+
+  await writeGoogleDriveJsonFile(
+    fileName,
+    { version: '1.0', updated_at: pendingEntry.timestamp, data: local },
+    remote.file,
+  )
+  return { status: 'synced', message: '' }
+}
+
+function acknowledgeSyncedQueueEntries(queue: DriveSyncQueueEntry[]): void {
+  const syncedIds = new Set(queue.map((entry) => entry.id))
+  const currentQueue = readDriveSyncQueue()
+  writeDriveSyncQueue(currentQueue.filter((entry) => !syncedIds.has(entry.id)))
+}
+
+export async function syncDriveReplica(localProfile: unknown, localWorkouts: unknown): Promise<DriveReplicaSyncResult> {
   if (!isGoogleDriveConnected()) {
     return { status: 'skipped', message: 'Google Drive nie jest połączone. Brak synchronizacji.' }
   }
 
   const queue = readDriveSyncQueue()
-  const remoteProfile = await readGoogleDriveJsonFile(GOOGLE_DRIVE_FILE_NAMES.profile).catch(() => undefined)
-  const remoteWorkouts = await readGoogleDriveJsonFile(GOOGLE_DRIVE_FILE_NAMES.workouts).catch(() => undefined)
+  const files = await listGoogleDriveAppDataFiles()
 
-  const profileConflict = compareDriveTimestamps(getUpdatedAt(localProfile), getUpdatedAt(remoteProfile))
-  if (profileConflict === 'remote' || (queue.some((entry) => entry.entity === 'profile') && profileConflict !== 'local')) {
-    return { status: 'conflict', message: 'Konflikt profilu: dane z Google Drive są nowsze. Rozwiąż konflikt ręcznie.' }
-  }
-
-  const workoutsConflict = compareDriveTimestamps(
-    Array.isArray(localWorkouts)
-      ? (localWorkouts as Array<{ updated_at?: string }>).map((entry) => entry.updated_at).filter(Boolean).sort().at(-1)
-      : undefined,
-    Array.isArray(remoteWorkouts)
-      ? (remoteWorkouts as Array<{ updated_at?: string }>).map((entry) => entry.updated_at).filter(Boolean).sort().at(-1)
-      : undefined,
+  const profileResult = await syncReplicaEntity(
+    'profile',
+    GOOGLE_DRIVE_FILE_NAMES.profile,
+    localProfile,
+    ProfileDocumentSchema,
+    DriveReplicaProfileSchema,
+    files,
+    queue,
   )
+  if (profileResult.status === 'conflict') return profileResult
 
-  if (workoutsConflict === 'remote' || (queue.some((entry) => entry.entity === 'workouts') && workoutsConflict !== 'local')) {
-    return { status: 'conflict', message: 'Konflikt treningów: dane z Google Drive są nowsze. Rozwiąż konflikt ręcznie.' }
-  }
+  const workoutsResult = await syncReplicaEntity(
+    'workouts',
+    GOOGLE_DRIVE_FILE_NAMES.workouts,
+    localWorkouts,
+    WorkoutSchema.array(),
+    DriveReplicaWorkoutsSchema,
+    files,
+    queue,
+  )
+  if (workoutsResult.status === 'conflict') return workoutsResult
 
-  if (localProfile && (profileConflict === 'local' || queue.some((entry) => entry.entity === 'profile'))) {
-    await writeGoogleDriveJsonFile(GOOGLE_DRIVE_FILE_NAMES.profile, localProfile)
-  }
-
-  if (localWorkouts && (workoutsConflict === 'local' || queue.some((entry) => entry.entity === 'workouts'))) {
-    await writeGoogleDriveJsonFile(GOOGLE_DRIVE_FILE_NAMES.workouts, localWorkouts)
-  }
-
-  clearDriveSyncQueue()
+  acknowledgeSyncedQueueEntries(queue)
 
   return {
     status: 'synced',

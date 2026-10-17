@@ -3,72 +3,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { getProfile, getWorkouts } from '@/lib/repositories'
-import type { WorkoutType } from '@/lib/schemas'
+import { groupWorkoutLogsByDate, createWorkoutLogs } from '@/lib/workout-history'
 import type { WorkoutLog } from '@/lib/trainer-data'
 import { WeightChart } from '../weight-chart'
 import { CalendarCard } from './calendar-card'
 import { WorkoutLogList } from './workout-log-list'
 import { WorkoutDetail } from './workout-detail'
 
-function inferWorkoutType(planName: string): WorkoutType {
-  const value = planName.toLowerCase()
-
-  if (value.includes('pull')) return 'pull'
-  if (value.includes('leg') || value.includes('nogi')) return 'legs'
-  if (value.includes('cardio')) return 'cardio'
-
-  return 'push'
-}
-
-function toWorkoutLog(workout: Awaited<ReturnType<typeof getWorkouts>>[number]): WorkoutLog {
-  const date = workout.start_time.slice(0, 10)
-  const sets = workout.exercises.flatMap((exercise) => exercise.sets)
-  const volume = sets.reduce((sum, set) => sum + set.weight_kg * set.reps, 0)
-  const duration = workout.end_time
-    ? Math.max(1, Math.round((new Date(workout.end_time).getTime() - new Date(workout.start_time).getTime()) / 60000))
-    : 0
-  const type = inferWorkoutType(workout.plan_name || 'Push')
-  const exerciseLines = workout.exercises.map((exercise) => {
-    const totalSets = exercise.sets.length
-    const summary = exercise.sets.length > 0 ? `${totalSets} × ${exercise.sets[0].reps}` : '0 × 0'
-    const bestSet = exercise.sets.reduce(
-      (best, set) => {
-        if (!best || set.weight_kg * set.reps > best.weight_kg * best.reps) {
-          return set
-        }
-        return best
-      },
-      exercise.sets[0],
-    )
-
-    return {
-      name: exercise.exercise_name,
-      sets: summary,
-      best: bestSet ? `${bestSet.weight_kg.toFixed(1).replace(/\.0$/, '')} kg × ${bestSet.reps}` : '—',
-    }
-  })
-
-  return {
-    date,
-    title: workout.plan_name || 'Trening',
-    type,
-    duration,
-    volume: Math.round(volume),
-    energy: workout.readiness_energy_score ?? 3,
-    notes: workout.post_workout_user_notes || undefined,
-    exercises: exerciseLines,
-    aiFeedback: workout.ai_analysis?.feedback_text
-      ? workout.ai_analysis.feedback_text
-          .split(/\n|(?<=[.!?])\s+/)
-          .map((line) => line.trim())
-          .filter(Boolean)
-      : ['Brak analizy AI dla tej sesji.'],
-  }
-}
-
 export function HistoryView() {
-  const [view, setView] = useState({ year: 2026, month: 9 })
-  const [selected, setSelected] = useState('')
+  const [view, setView] = useState(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() }
+  })
+  const [selectedDate, setSelectedDate] = useState('')
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState('')
   const [logState, setLogState] = useState<WorkoutLog[]>([])
   const [weights, setWeights] = useState<{ date: string; weight: number }[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -84,11 +32,21 @@ export function HistoryView() {
         date: entry.date.slice(5).replace('-', '.'),
         weight: Number(entry.weight_kg.toFixed(1)),
       }))
-      const nextLogs = [...workouts].sort((a, b) => b.start_time.localeCompare(a.start_time)).map(toWorkoutLog)
+      const nextLogs = createWorkoutLogs(workouts)
 
       setWeights(nextWeights)
       setLogState(nextLogs)
-      setSelected((current) => (nextLogs.some((log) => log.date === current) ? current : nextLogs[0]?.date ?? ''))
+      const latestWorkout = nextLogs[0]
+      setSelectedDate((current) =>
+        nextLogs.some((log) => log.date === current) ? current : latestWorkout?.date ?? '',
+      )
+      setSelectedWorkoutId((current) =>
+        nextLogs.some((log) => log.id === current) ? current : latestWorkout?.id ?? '',
+      )
+      if (latestWorkout) {
+        const [year, month] = latestWorkout.date.split('-').map(Number)
+        setView({ year: year!, month: month! - 1 })
+      }
       setStatus('ready')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Nie udało się wczytać historii treningów.')
@@ -103,16 +61,28 @@ export function HistoryView() {
     return () => window.clearTimeout(timeoutId)
   }, [loadHistory])
 
-  const logsByDate = useMemo(() => new Map(logState.map((log) => [log.date, log])), [logState])
+  const logsByDate = useMemo(() => groupWorkoutLogsByDate(logState), [logState])
   const monthPrefix = `${view.year}-${String(view.month + 1).padStart(2, '0')}`
-  const monthLogs = logState.filter((log) => log.date.startsWith(monthPrefix)).reverse()
-  const effectiveSelected = selected && logsByDate.has(selected) ? selected : logState[0]?.date ?? ''
+  const monthLogs = logState.filter((log) => log.date.startsWith(monthPrefix))
+  const effectiveSelectedDate =
+    selectedDate && logsByDate.has(selectedDate) ? selectedDate : logState[0]?.date ?? ''
+  const selectedLog =
+    logState.find((log) => log.id === selectedWorkoutId && log.date === effectiveSelectedDate) ??
+    logsByDate.get(effectiveSelectedDate)?.[0]
 
   const changeMonth = (delta: number) =>
     setView(({ year, month }) => {
       const d = new Date(year, month + delta, 1)
       return { year: d.getFullYear(), month: d.getMonth() }
     })
+  const selectDate = (date: string) => {
+    setSelectedDate(date)
+    setSelectedWorkoutId(logsByDate.get(date)?.[0]?.id ?? '')
+  }
+  const selectWorkout = (log: WorkoutLog) => {
+    setSelectedDate(log.date)
+    setSelectedWorkoutId(log.id)
+  }
 
   if (status === 'loading') {
     return (
@@ -159,15 +129,15 @@ export function HistoryView() {
             year={view.year}
             month={view.month}
             logsByDate={logsByDate}
-            selected={effectiveSelected}
-            onSelect={setSelected}
+            selected={effectiveSelectedDate}
+            onSelect={selectDate}
             onChangeMonth={changeMonth}
           />
-          <WorkoutLogList logs={monthLogs} selected={effectiveSelected} onSelect={setSelected} />
+          <WorkoutLogList logs={monthLogs} selectedId={selectedLog?.id ?? ''} onSelect={selectWorkout} />
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <WorkoutDetail date={effectiveSelected} log={logsByDate.get(effectiveSelected)} />
+          <WorkoutDetail date={effectiveSelectedDate} log={selectedLog} />
           <Card>
             <CardHeader>
               <CardTitle className="font-semibold">Postęp wagi</CardTitle>

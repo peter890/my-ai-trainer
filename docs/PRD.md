@@ -60,7 +60,7 @@ Aplikacja odpowiada bezpośrednio 5 głównym filarom roli żywego Trenera Perso
 ### MODUŁ 5: Odłożona Finalizacja i Analiza Post-Workout przez AI
 * 5.1. Odłożone Zakończenie Sesji: Przycisk "Zakończ sesję na siłowni" zatrzymuje stoper i zapisuje dane lokalnie, pozwalając na dokończenie podsumowania w domu.
 * 5.2. Ankieta Końcowa w Domu: Ocena poziomu energii/zmęczenia (skala 1-5) oraz pole tekstowe na ogólne uwagi z treningu.
-* 5.3. Automatyczna Analiza AI (Gemini): Wysyłanie zestawienia sesji, profilu biometrycznego i historii treningów do Gemini API. Wyświetlanie karty z wnioskami i zaleceniami na kolejny trening.
+* 5.3. Analiza AI (Gemini): Wysyłanie zestawienia sesji, wybranych danych profilu i podsumowań maksymalnie 3 ostatnich treningów do Gemini API dopiero po wyświetleniu informacji o zakresie danych i uzyskaniu zgody użytkownika. Wyświetlanie karty z wnioskami i zaleceniami na kolejny trening.
 
 ### MODUŁ 6: Kalendarz, Historia i Generator Planów
 * 6.1. Widok Kalendarza: Widok miesiąca z oznaczonymi dniami treningowymi (budowanie nawyku/streak). Kliknięcie w dzień otwiera historyczne wyniki i analizę AI.
@@ -113,7 +113,8 @@ Aplikacja odpowiada bezpośrednio 5 głównym filarom roli żywego Trenera Perso
       "heavy_compound": 180,
       "moderate_compound": 120,
       "isolation": 60
-    }
+    },
+    "rest_timer_signal": "vibrate"
   }
 }
 

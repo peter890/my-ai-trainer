@@ -3,19 +3,18 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { workoutTypeMeta } from '@/lib/format'
+import { formatPolishCount, workoutTypeMeta } from '@/lib/format'
 import type { WorkoutLog, WorkoutType } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
 const weekdays = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd']
-const TODAY = '2026-10-14'
 
 const monthFormatter = new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' })
 
 type Props = {
   year: number
   month: number
-  logsByDate: Map<string, WorkoutLog>
+  logsByDate: Map<string, WorkoutLog[]>
   selected: string
   onSelect: (date: string) => void
   onChangeMonth: (delta: number) => void
@@ -27,7 +26,11 @@ export function CalendarCard({ year, month, logsByDate, selected, onSelect, onCh
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const label = monthFormatter.format(first)
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}`
-  const count = Array.from(logsByDate.keys()).filter((d) => d.startsWith(prefix)).length
+  const today = new Date()
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const count = Array.from(logsByDate.entries())
+    .filter(([date]) => date.startsWith(prefix))
+    .reduce((total, [, dayLogs]) => total + dayLogs.length, 0)
 
   return (
     <Card>
@@ -35,7 +38,7 @@ export function CalendarCard({ year, month, logsByDate, selected, onSelect, onCh
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold capitalize">{label}</h2>
-            <p className="text-xs text-muted-foreground">{count} treningów w miesiącu</p>
+            <p className="text-xs text-muted-foreground">{formatPolishCount(count, 'trening', 'treningi', 'treningów')} w miesiącu</p>
           </div>
           <div className="flex gap-1">
             <Button variant="outline" size="icon-lg" onClick={() => onChangeMonth(-1)} aria-label="Poprzedni miesiąc">
@@ -59,9 +62,10 @@ export function CalendarCard({ year, month, logsByDate, selected, onSelect, onCh
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1
             const date = `${prefix}-${String(day).padStart(2, '0')}`
-            const log = logsByDate.get(date)
+            const dayLogs = logsByDate.get(date) ?? []
+            const log = dayLogs[0]
             const isSelected = date === selected
-            const isToday = date === TODAY
+            const isToday = date === todayKey
             return (
               <button
                 key={date}
@@ -69,7 +73,7 @@ export function CalendarCard({ year, month, logsByDate, selected, onSelect, onCh
                 role="gridcell"
                 onClick={() => onSelect(date)}
                 aria-selected={isSelected}
-                aria-label={`${day}${log ? `, ${log.title}` : ''}`}
+                aria-label={`${day}${dayLogs.length ? `, ${formatPolishCount(dayLogs.length, 'trening', 'treningi', 'treningów')}` : ''}`}
                 className={cn(
                   'flex aspect-square flex-col items-center justify-center gap-1 rounded-xl text-sm transition-colors',
                   isSelected
@@ -82,11 +86,15 @@ export function CalendarCard({ year, month, logsByDate, selected, onSelect, onCh
                 <span className="tabular-nums">{day}</span>
                 <span
                   className={cn(
-                    'size-1.5 rounded-full',
+                    dayLogs.length > 1
+                      ? 'text-[9px] font-semibold leading-none'
+                      : 'size-1.5 rounded-full',
                     log ? (isSelected ? 'bg-primary-foreground' : workoutTypeMeta[log.type].dot) : 'bg-transparent',
                   )}
                   aria-hidden="true"
-                />
+                >
+                  {dayLogs.length > 1 ? dayLogs.length : null}
+                </span>
               </button>
             )
           })}

@@ -18,6 +18,7 @@ export function AppShell() {
   const [liveActive, setLiveActive] = useState(false)
   const [liveVisible, setLiveVisible] = useState(false)
   const [hasUnfinalized, setHasUnfinalized] = useState(false)
+  const [selectedPlanId, setSelectedPlanId] = useState('')
 
   useEffect(() => {
     let active = true
@@ -49,7 +50,8 @@ export function AppShell() {
     window.scrollTo({ top: 0 })
   }
 
-  const startWorkout = () => {
+  const startWorkout = (planId: string) => {
+    setSelectedPlanId(planId)
     setLiveActive(true)
     setLiveVisible(true)
     window.scrollTo({ top: 0 })
@@ -61,6 +63,13 @@ export function AppShell() {
     setHasUnfinalized(true)
     setTab('dashboard')
     window.scrollTo({ top: 0 })
+  }
+
+  const abortWorkoutStart = () => {
+    setLiveActive(false)
+    setLiveVisible(false)
+    setSelectedPlanId('')
+    setTab('dashboard')
   }
 
   return (
@@ -87,7 +96,12 @@ export function AppShell() {
         <main className={cn('flex-1', !liveVisible && 'pb-28 md:pb-10')}>
           {liveActive && (
             <div className={cn(!liveVisible && 'hidden')}>
-              <LiveWorkout onMinimize={() => setLiveVisible(false)} onFinish={finishWorkout} />
+              <LiveWorkout
+                planId={selectedPlanId}
+                onMinimize={() => setLiveVisible(false)}
+                onAbort={abortWorkoutStart}
+                onFinish={finishWorkout}
+              />
             </div>
           )}
 

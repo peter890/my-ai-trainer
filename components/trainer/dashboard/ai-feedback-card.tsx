@@ -2,7 +2,7 @@ import { Bot, Check } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
 type Props = {
-  status: 'idle' | 'loading' | 'done' | 'error'
+  status: 'idle' | 'loading' | 'saving' | 'done' | 'saved' | 'error'
   analysisText?: string
   errorText?: string
   onArchive: () => void
@@ -40,6 +40,14 @@ export function AiFeedbackCard({ status, analysisText, errorText, onArchive, onR
           </div>
         )}
 
+        {status === 'saving' && (
+          <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border p-6 text-center">
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              Trening jest zapisywany bez analizy AI…
+            </p>
+          </div>
+        )}
+
         {status === 'error' && (
           <div className="flex flex-1 flex-col justify-center gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
             <p className="text-sm font-medium text-destructive">Nie udało się wygenerować analizy.</p>
@@ -66,6 +74,22 @@ export function AiFeedbackCard({ status, analysisText, errorText, onArchive, onR
             >
               <Check className="size-4" aria-hidden="true" />
               Zapisz w historii
+            </button>
+          </article>
+        )}
+
+        {status === 'saved' && (
+          <article className="flex flex-1 flex-col gap-4">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Trening i ankieta zostały zapisane w historii. Analizę AI możesz pominąć.
+            </p>
+            <button
+              type="button"
+              onClick={onArchive}
+              className="mt-auto flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-secondary/50 text-sm font-medium transition-colors hover:bg-secondary"
+            >
+              <Check className="size-4" aria-hidden="true" />
+              Zapisz w historii i przejdź dalej
             </button>
           </article>
         )}

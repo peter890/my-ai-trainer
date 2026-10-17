@@ -86,14 +86,47 @@ export function ExercisesView() {
     }
   }
 
+  const toggleActive = async (id: string) => {
+    const exercise = records.find((record) => record.id === id)
+    if (!exercise) return
+    const updatedExercise = { ...exercise, active: !exercise.active }
+
+    try {
+      const savedExercise = await saveExercise(updatedExercise)
+      setRecords((current) =>
+        current.map((record) => (record.id === id ? savedExercise : record)),
+      )
+      setError('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Nie udało się zmienić aktywności ćwiczenia.')
+    }
+  }
+
+  const updateTechniqueNote = async (id: string, techniqueNote: string): Promise<boolean> => {
+    const exercise = records.find((record) => record.id === id)
+    if (!exercise) return false
+
+    try {
+      const savedExercise = await saveExercise({ ...exercise, technique_note: techniqueNote })
+      setRecords((current) =>
+        current.map((record) => (record.id === id ? savedExercise : record)),
+      )
+      setError('')
+      return true
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Nie udało się zapisać notatki technicznej.')
+      return false
+    }
+  }
+
   const add = async (draft: Omit<ExerciseDraft, 'id'>) => {
     try {
       const record = createExerciseRecord({
         ...draft,
         id: `custom-${crypto.randomUUID()}`,
       })
-      await saveExercise(record)
-      setRecords((current) => [record, ...current])
+      const savedExercise = await saveExercise(record)
+      setRecords((current) => [savedExercise, ...current])
       setError('')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Nie udało się dodać ćwiczenia.')
@@ -134,7 +167,12 @@ export function ExercisesView() {
 
         <TabsContent value="catalog">
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6">
-            <ExerciseCatalog exercises={exercises} onToggle={(id, key) => void toggle(id, key)} />
+            <ExerciseCatalog
+              exercises={exercises}
+              onToggle={(id, key) => void toggle(id, key)}
+              onToggleActive={(id) => void toggleActive(id)}
+              onSaveTechniqueNote={updateTechniqueNote}
+            />
             <AddExerciseCard onAdd={add} />
           </div>
         </TabsContent>

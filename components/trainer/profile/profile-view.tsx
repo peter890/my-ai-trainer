@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { getProfile, saveProfile } from '@/lib/repositories'
-import type { ProfileDocument } from '@/lib/schemas'
+import type { ExperienceLevel, Gender, PrimaryGoal, ProfileDocument } from '@/lib/schemas'
 import { BiometricsCard } from './biometrics-card'
 import { WeightHistoryCard } from './weight-history-card'
 import { GeminiCard } from './gemini-card'
 import { DriveSyncCard } from './drive-sync-card'
+import { BackupCard } from './backup-card'
+import { RestSettingsCard } from './rest-settings-card'
 
 const defaultProfileDocument: ProfileDocument = {
   version: '1.0',
@@ -41,14 +43,9 @@ const defaultProfileDocument: ProfileDocument = {
       moderate_compound: 120,
       isolation: 60,
     },
+    rest_timer_signal: 'vibrate',
   },
 }
-
-const genderLabels = {
-  male: 'Mężczyzna',
-  female: 'Kobieta',
-  other: 'Inna',
-} as const
 
 function formatDisplayDate(date: string) {
   const parsed = new Date(`${date}T12:00:00Z`)
@@ -63,6 +60,7 @@ export function ProfileView() {
   const [profile, setProfile] = useState<ProfileDocument>(defaultProfileDocument)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   const loadProfile = async () => {
     setStatus('loading')
@@ -99,12 +97,24 @@ export function ProfileView() {
   useEffect(() => {
     if (status !== 'ready') return
 
-    void saveProfile({
-      ...profile,
-      updated_at: new Date().toISOString(),
-    }).catch((cause) => {
-      console.error('Nie udało się zapisać profilu.', cause)
-    })
+    let active = true
+    const timeout = window.setTimeout(() => {
+      void saveProfile({
+        ...profile,
+        updated_at: new Date().toISOString(),
+      }).then(() => {
+        if (active) setSaveError('')
+      }).catch((cause: unknown) => {
+        if (active) {
+          setSaveError(cause instanceof Error ? cause.message : 'Nie udało się zapisać profilu.')
+        }
+      })
+    }, 250)
+
+    return () => {
+      active = false
+      window.clearTimeout(timeout)
+    }
   }, [profile, status])
 
   const currentWeight = profile.profile.weight_history.at(-1)?.weight_kg ?? 0
@@ -134,7 +144,7 @@ export function ProfileView() {
     })
   }
 
-  const handleGenderChange = (gender: keyof typeof genderLabels) => {
+  const handleGenderChange = (gender: Gender) => {
     setProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
@@ -164,6 +174,52 @@ export function ProfileView() {
         ...current.profile,
         height_cm: Number.isFinite(height) ? Math.min(Math.max(height, 1), 300) : current.profile.height_cm,
       },
+    }))
+  }
+
+  const handleExperienceLevelChange = (experienceLevel: ExperienceLevel) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      profile: { ...current.profile, experience_level: experienceLevel },
+    }))
+  }
+
+  const handlePrimaryGoalChange = (primaryGoal: PrimaryGoal) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      profile: { ...current.profile, primary_goal: primaryGoal },
+    }))
+  }
+
+  const handleInjuriesNotesChange = (injuriesNotes: string) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      profile: { ...current.profile, injuries_notes: injuriesNotes },
+    }))
+  }
+
+  const handleRestTimerChange = (key: keyof ProfileDocument['settings']['rest_timer_defaults'], seconds: number) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      settings: {
+        ...current.settings,
+        rest_timer_defaults: {
+          ...current.settings.rest_timer_defaults,
+          [key]: seconds,
+        },
+      },
+    }))
+  }
+
+  const handleRestTimerSignalChange = (signal: ProfileDocument['settings']['rest_timer_signal']) => {
+    setProfile((current) => ({
+      ...current,
+      updated_at: new Date().toISOString(),
+      settings: { ...current.settings, rest_timer_signal: signal },
     }))
   }
 
@@ -209,13 +265,25 @@ export function ProfileView() {
       <div className="grid items-start gap-4 lg:grid-cols-2 lg:gap-6">
         <div className="flex flex-col gap-4">
           <BiometricsCard
-            gender={genderLabels[profile.profile.gender]}
+            gender={profile.profile.gender}
             age={profile.profile.age}
             height={profile.profile.height_cm}
             weight={currentWeight}
-            onGenderChange={(value) => handleGenderChange(Object.entries(genderLabels).find(([, label]) => label === value)?.[0] as keyof typeof genderLabels ?? 'male')}
+            experienceLevel={profile.profile.experience_level}
+            primaryGoal={profile.profile.primary_goal}
+            injuriesNotes={profile.profile.injuries_notes}
+            onGenderChange={handleGenderChange}
             onAgeChange={handleAgeChange}
             onHeightChange={handleHeightChange}
+            onExperienceLevelChange={handleExperienceLevelChange}
+            onPrimaryGoalChange={handlePrimaryGoalChange}
+            onInjuriesNotesChange={handleInjuriesNotesChange}
+          />
+          <RestSettingsCard
+            values={profile.settings.rest_timer_defaults}
+            onChange={handleRestTimerChange}
+            signal={profile.settings.rest_timer_signal}
+            onSignalChange={handleRestTimerSignalChange}
           />
           <GeminiCard />
         </div>
@@ -224,6 +292,12 @@ export function ProfileView() {
           <DriveSyncCard />
         </div>
       </div>
+      {saveError ? (
+        <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          Nie udało się zapisać zmian profilu: {saveError}
+        </p>
+      ) : null}
+      <BackupCard />
     </div>
   )
 }

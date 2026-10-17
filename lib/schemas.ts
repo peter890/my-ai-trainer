@@ -13,9 +13,59 @@ export const EquipmentSchema = z.enum([
   'cardio',
 ])
 export const RestTypeSchema = z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'cardio'])
+export const RestTimerSignalSchema = z.enum(['none', 'vibrate']).default('vibrate')
 export const WorkoutTypeSchema = z.enum(['push', 'pull', 'legs', 'cardio'])
 export const WorkoutStatusSchema = z.enum(['in_progress', 'pending_finalization', 'completed'])
 export const EntityIdSchema = z.string().trim().min(1).max(100)
+export const WorkoutLogSchema = z
+  .object({
+    id: EntityIdSchema,
+    date: z.iso.date(),
+    time: z.string().regex(/^\d{2}:\d{2}$/),
+    title: z.string().trim().min(1).max(120),
+    type: WorkoutTypeSchema,
+    duration: z.number().int().nonnegative(),
+    volume: z.number().nonnegative(),
+    energy: z.number().int().min(1).max(5),
+    notes: z.string().optional(),
+    exercises: z.array(
+      z
+        .object({
+          name: z.string().trim().min(1).max(120),
+          sets: z.string().max(80),
+          best: z.string().max(80),
+        })
+        .strict(),
+    ),
+    aiFeedback: z.array(z.string().max(4000)),
+  })
+  .strict()
+export const WeeklyWorkoutStatsSchema = z
+  .object({
+    workout_count: z.number().int().nonnegative(),
+    volume_kg: z.number().nonnegative(),
+    duration_minutes: z.number().int().nonnegative(),
+    set_count: z.number().int().nonnegative(),
+  })
+  .strict()
+export const WorkoutDashboardStatsSchema = z
+  .object({
+    streak_weeks: z.number().int().nonnegative(),
+    current_week: WeeklyWorkoutStatsSchema,
+    week_activity: z
+      .array(
+        z
+          .object({
+            date: z.iso.date(),
+            label: z.string().min(1).max(4),
+            has_workout: z.boolean(),
+            is_today: z.boolean(),
+          })
+          .strict(),
+      )
+      .length(7),
+  })
+  .strict()
 
 const IsoDateSchema = z.iso.date()
 const IsoDateTimeSchema = z.iso.datetime()
@@ -30,7 +80,9 @@ export const WeightEntrySchema = z
 export const ExerciseSchema = z
   .object({
     id: EntityIdSchema,
+    updated_at: IsoDateTimeSchema.optional(),
     name: z.string().trim().min(1).max(120),
+    active: z.boolean().default(true),
     category: MuscleGroupSchema,
     equipment: EquipmentSchema,
     rest_type: RestTypeSchema,
@@ -45,6 +97,7 @@ export const CustomExerciseSchema = ExerciseSchema.extend({
 
 export const ExercisePreferencesSchema = z
   .object({
+    updated_at: IsoDateTimeSchema.optional(),
     excluded_exercise_ids: z.array(EntityIdSchema),
     favorite_exercise_ids: z.array(EntityIdSchema),
   })
@@ -91,6 +144,7 @@ export const ProfileDocumentSchema = z
             isolation: z.number().int().min(1).max(3600),
           })
           .strict(),
+          rest_timer_signal: RestTimerSignalSchema,
       })
       .strict(),
   })
@@ -159,16 +213,27 @@ export const WorkoutExerciseSchema = z
   })
   .strict()
 
+export const AiAnalysisFeedbackSchema = z.string().trim().min(1).max(4000).superRefine((text, context) => {
+  const wordCount = text.match(/\S+/g)?.length ?? 0
+  if (wordCount > 150) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Analiza AI nie może przekraczać 150 słów.',
+    })
+  }
+})
+
 export const AiAnalysisSchema = z
   .object({
     generated_at: IsoDateTimeSchema,
-    feedback_text: z.string().trim().min(1).max(4000),
+    feedback_text: AiAnalysisFeedbackSchema,
   })
   .strict()
 
 export const WorkoutSchema = z
   .object({
     id: z.string().min(1).max(100),
+    updated_at: IsoDateTimeSchema.optional(),
     start_time: IsoDateTimeSchema,
     end_time: IsoDateTimeSchema.optional(),
     status: WorkoutStatusSchema,
@@ -216,6 +281,36 @@ export const WorkoutSchema = z
     }
   })
 
+export const LiveSessionSnapshotSchema = z
+  .object({
+    workout_id: EntityIdSchema,
+    plan_id: EntityIdSchema,
+    exercise_ids: z.array(EntityIdSchema).min(1).max(100),
+    exercise_index: z.number().int().nonnegative().max(99),
+    draft: z
+      .object({
+        weight: z.string().max(20),
+        reps: z.string().max(10),
+        rir: z.number().int().min(0).max(4),
+      })
+      .strict(),
+    paused: z.boolean(),
+    elapsed_ms: z.number().int().nonnegative(),
+    rest_remaining_ms: z.number().int().nonnegative(),
+    rest_total_ms: z.number().int().nonnegative(),
+    updated_at: IsoDateTimeSchema,
+  })
+  .strict()
+  .superRefine((snapshot, context) => {
+    if (snapshot.exercise_index >= snapshot.exercise_ids.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Bieżące ćwiczenie nie istnieje w zapisanej sesji.',
+        path: ['exercise_index'],
+      })
+    }
+  })
+
 export type Gender = z.infer<typeof GenderSchema>
 export type ExperienceLevel = z.infer<typeof ExperienceLevelSchema>
 export type PrimaryGoal = z.infer<typeof PrimaryGoalSchema>
@@ -224,6 +319,9 @@ export type Equipment = z.infer<typeof EquipmentSchema>
 export type RestType = z.infer<typeof RestTypeSchema>
 export type WorkoutType = z.infer<typeof WorkoutTypeSchema>
 export type WorkoutStatus = z.infer<typeof WorkoutStatusSchema>
+export type WorkoutLog = z.infer<typeof WorkoutLogSchema>
+export type WeeklyWorkoutStats = z.infer<typeof WeeklyWorkoutStatsSchema>
+export type WorkoutDashboardStats = z.infer<typeof WorkoutDashboardStatsSchema>
 export type WeightEntry = z.infer<typeof WeightEntrySchema>
 export type Exercise = z.infer<typeof ExerciseSchema>
 export type ExerciseInput = z.input<typeof ExerciseSchema>
@@ -240,3 +338,4 @@ export type WorkoutExercise = z.infer<typeof WorkoutExerciseSchema>
 export type AiAnalysis = z.infer<typeof AiAnalysisSchema>
 export type Workout = z.infer<typeof WorkoutSchema>
 export type WorkoutInput = z.input<typeof WorkoutSchema>
+export type LiveSessionSnapshot = z.infer<typeof LiveSessionSnapshotSchema>

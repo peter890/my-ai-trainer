@@ -1,22 +1,10 @@
-import type { WorkoutType } from './schemas'
+import type { RestType, WorkoutLog, WorkoutType } from './schemas'
 
 export type TabId = 'dashboard' | 'history' | 'exercises' | 'profile'
 
-export type { WorkoutType } from './schemas'
+export type { WorkoutLog, WorkoutType } from './schemas'
 
 export type LoggedSet = { weight: number; reps: number; rir: number }
-
-export type WorkoutLog = {
-  date: string
-  title: string
-  type: WorkoutType
-  duration: number
-  volume: number
-  energy: number
-  notes?: string
-  exercises: { name: string; sets: string; best: string }[]
-  aiFeedback: string[]
-}
 
 export type MuscleGroup = 'Klatka' | 'Plecy' | 'Barki' | 'Nogi' | 'Ramiona' | 'Brzuch'
 
@@ -25,8 +13,11 @@ export const muscleGroups: MuscleGroup[] = ['Klatka', 'Plecy', 'Barki', 'Nogi', 
 export type Exercise = {
   id: string
   name: string
+  active: boolean
   muscle: MuscleGroup
   equipment: string
+  restType: RestType
+  techniqueNote: string
   favorite: boolean
   excluded: boolean
   custom?: boolean

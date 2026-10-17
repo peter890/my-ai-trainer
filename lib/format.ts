@@ -20,6 +20,17 @@ export function formatDuration(totalSeconds: number, withHours = true) {
 
 export const numberFormat = new Intl.NumberFormat('pl-PL')
 
+export function formatPolishCount(count: number, one: string, few: string, many: string): string {
+  const lastTwoDigits = count % 100
+  const lastDigit = count % 10
+  const form = count === 1
+    ? one
+    : lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)
+      ? few
+      : many
+  return `${count} ${form}`
+}
+
 export function formatHistoryDate(date: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
 
@@ -30,6 +41,7 @@ export function formatHistoryDate(date: string): string | null {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    year: 'numeric',
     timeZone: 'UTC',
   }).format(parsed)
 }

@@ -1,15 +1,23 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   GoogleDriveFileSchema,
   GOOGLE_DRIVE_FILE_NAMES,
   GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
   clearDriveSyncQueue,
   compareDriveTimestamps,
+  connectGoogleDrive,
   createDriveSyncSummary,
+  disconnectGoogleDrive,
   enqueueDriveSync,
   readPersistedGoogleDriveToken,
   readDriveSyncQueue,
+  syncDriveReplica,
 } from './google-drive'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 
 function createMemoryStorage(): Storage {
   const store = new Map<string, string>()
@@ -63,9 +71,67 @@ describe('google drive helpers', () => {
 
     storage.setItem(
       GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
-      JSON.stringify({ access_token: 'expired-token', expires_at: now - 1 }),
+      JSON.stringify({ access_token: 'nearly-expired-token', expires_at: now + 30_000 }),
     )
     expect(readPersistedGoogleDriveToken(storage, now)).toBeNull()
+    expect(storage.getItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)).toBeNull()
+  })
+
+  it('requests only the Drive AppData scope and persists the returned short-lived token', async () => {
+    const storage = createMemoryStorage()
+    const requestAccessToken = vi.fn()
+    const initTokenClient = vi.fn((config: {
+      client_id: string
+      scope: string
+      callback: (response: { access_token: string; expires_in: number }) => void
+    }) => {
+      requestAccessToken.mockImplementation(() => {
+        config.callback({ access_token: 'oauth-token', expires_in: 3600 })
+      })
+      return { requestAccessToken }
+    })
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id')
+    vi.stubGlobal('document', {})
+    vi.stubGlobal('window', {
+      localStorage: storage,
+      dispatchEvent: vi.fn(),
+      google: { accounts: { oauth2: { initTokenClient } } },
+    })
+
+    await expect(connectGoogleDrive()).resolves.toBe('oauth-token')
+
+    expect(initTokenClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client_id: 'test-client-id',
+        scope: 'https://www.googleapis.com/auth/drive.appdata',
+      }),
+    )
+    expect(requestAccessToken).toHaveBeenCalledOnce()
+    expect(JSON.parse(storage.getItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY) ?? '{}')).toMatchObject({
+      access_token: 'oauth-token',
+    })
+    disconnectGoogleDrive()
+    expect(storage.getItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)).toBeNull()
+  })
+
+  it('does not persist a token when Google denies the requested permission', async () => {
+    const storage = createMemoryStorage()
+    const initTokenClient = vi.fn((config: {
+      client_id: string
+      scope: string
+      callback: (response: { access_token?: string; expires_in?: number; error?: string }) => void
+    }) => ({
+      requestAccessToken: () => config.callback({ error: 'access_denied' }),
+    }))
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id')
+    vi.stubGlobal('document', {})
+    vi.stubGlobal('window', {
+      localStorage: storage,
+      dispatchEvent: vi.fn(),
+      google: { accounts: { oauth2: { initTokenClient } } },
+    })
+
+    await expect(connectGoogleDrive()).rejects.toThrow('access_denied')
     expect(storage.getItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)).toBeNull()
   })
 
@@ -80,5 +146,247 @@ describe('google drive helpers', () => {
 
     clearDriveSyncQueue(storage)
     expect(readDriveSyncQueue(storage)).toHaveLength(0)
+  })
+
+  it('uploads local replicas as versioned files and clears the queue only after both uploads succeed', async () => {
+    const storage = createMemoryStorage()
+    storage.setItem(
+      GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+      JSON.stringify({ access_token: 'test-token', expires_at: Date.now() + 3_600_000 }),
+    )
+    vi.stubGlobal('window', { localStorage: storage, dispatchEvent: vi.fn() })
+
+    const calls: { url: string; method: string; body: string }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        calls.push({ url, method, body: String(init?.body ?? '') })
+
+        if (url.includes('/upload/drive/v3/files?uploadType=multipart')) {
+          return new Response(JSON.stringify({ id: `created-${calls.length}` }), { status: 200 })
+        }
+        if (url.includes('/drive/v3/files?')) {
+          return new Response(JSON.stringify({ files: [] }), { status: 200 })
+        }
+        return new Response('Unexpected request', { status: 500 })
+      }) as typeof fetch,
+    )
+
+    const profile = {
+      version: '1.0' as const,
+      updated_at: '2026-10-15T12:00:00.000Z',
+      profile: {
+        gender: 'female' as const,
+        age: 28,
+        height_cm: 170,
+        weight_history: [],
+        experience_level: 'beginner' as const,
+        primary_goal: 'strength' as const,
+        injuries_notes: '',
+      },
+      exercise_preferences: {
+        excluded_exercise_ids: [],
+        favorite_exercise_ids: [],
+        custom_exercises: [],
+      },
+      settings: {
+        rest_timer_defaults: {
+          heavy_compound: 180,
+          moderate_compound: 120,
+          isolation: 60,
+        },
+      },
+    }
+
+    enqueueDriveSync('profile', profile, storage)
+    enqueueDriveSync('workouts', [], storage)
+    const result = await syncDriveReplica(profile, [])
+
+    expect(result.status).toBe('synced')
+    const uploads = calls.filter((call) => call.method === 'POST')
+    expect(uploads).toHaveLength(2)
+    expect(uploads.every((call) => call.body.includes('"version": "1.0"') && call.body.includes('"data":'))).toBe(true)
+    expect(readDriveSyncQueue(storage)).toHaveLength(0)
+  })
+
+  it('keeps queued changes and does not overwrite a newer remote replica', async () => {
+    const storage = createMemoryStorage()
+    storage.setItem(
+      GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+      JSON.stringify({ access_token: 'test-token', expires_at: Date.now() + 3_600_000 }),
+    )
+    vi.stubGlobal('window', { localStorage: storage, dispatchEvent: vi.fn() })
+
+    const profile = {
+      version: '1.0' as const,
+      updated_at: '2026-10-15T12:00:00.000Z',
+      profile: {
+        gender: 'female' as const,
+        age: 28,
+        height_cm: 170,
+        weight_history: [],
+        experience_level: 'beginner' as const,
+        primary_goal: 'strength' as const,
+        injuries_notes: '',
+      },
+      exercise_preferences: {
+        excluded_exercise_ids: [],
+        favorite_exercise_ids: [],
+        custom_exercises: [],
+      },
+      settings: {
+        rest_timer_defaults: {
+          heavy_compound: 180,
+          moderate_compound: 120,
+          isolation: 60,
+        },
+      },
+    }
+    const newerRemoteProfile = { ...profile, updated_at: '2099-10-16T12:00:00.000Z' }
+    const queueEntry = enqueueDriveSync('profile', profile, storage)
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        calls.push(url)
+        if (url.includes('/drive/v3/files?')) {
+          return new Response(
+            JSON.stringify({
+              files: [
+                {
+                  id: 'remote-profile',
+                  name: GOOGLE_DRIVE_FILE_NAMES.profile,
+                  mimeType: 'application/json',
+                  modifiedTime: '2099-10-16T12:00:00.000Z',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/files/remote-profile?alt=media')) {
+          return new Response(
+            JSON.stringify({ version: '1.0', updated_at: '2099-10-16T12:00:00.000Z', data: newerRemoteProfile }),
+            { status: 200 },
+          )
+        }
+        return new Response('Unexpected request', { status: 500 })
+      }) as typeof fetch,
+    )
+
+    const result = await syncDriveReplica(profile, [])
+
+    expect(result.status).toBe('conflict')
+    expect(readDriveSyncQueue(storage)).toMatchObject([{ id: queueEntry.id }])
+    expect(calls.some((url) => url.includes('/upload/'))).toBe(false)
+  })
+
+  it('updates an existing Drive file instead of creating a duplicate', async () => {
+    const storage = createMemoryStorage()
+    storage.setItem(
+      GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+      JSON.stringify({ access_token: 'test-token', expires_at: Date.now() + 3_600_000 }),
+    )
+    vi.stubGlobal('window', { localStorage: storage, dispatchEvent: vi.fn() })
+
+    const profile = {
+      version: '1.0' as const,
+      updated_at: '2026-10-16T12:00:00.000Z',
+      profile: {
+        gender: 'female' as const,
+        age: 28,
+        height_cm: 170,
+        weight_history: [],
+        experience_level: 'beginner' as const,
+        primary_goal: 'strength' as const,
+        injuries_notes: '',
+      },
+      exercise_preferences: {
+        excluded_exercise_ids: [],
+        favorite_exercise_ids: [],
+        custom_exercises: [],
+      },
+      settings: {
+        rest_timer_defaults: {
+          heavy_compound: 180,
+          moderate_compound: 120,
+          isolation: 60,
+        },
+      },
+    }
+    const remoteProfile = { ...profile, updated_at: '2026-10-15T12:00:00.000Z' }
+    enqueueDriveSync('profile', profile, storage)
+    const methods: string[] = []
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const method = init?.method ?? 'GET'
+        methods.push(`${method} ${url}`)
+        if (url.includes('/upload/drive/v3/files/existing-profile?uploadType=media')) {
+          return new Response(
+            JSON.stringify({
+              id: 'existing-profile',
+              name: GOOGLE_DRIVE_FILE_NAMES.profile,
+              mimeType: 'application/json',
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/upload/drive/v3/files?uploadType=multipart')) {
+          return new Response(JSON.stringify({ id: 'created-workouts' }), { status: 200 })
+        }
+        if (url.includes('/drive/v3/files?')) {
+          return new Response(
+            JSON.stringify({
+              files: [
+                {
+                  id: 'existing-profile',
+                  name: GOOGLE_DRIVE_FILE_NAMES.profile,
+                  mimeType: 'application/json',
+                  modifiedTime: '2026-10-15T12:00:00.000Z',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/files/existing-profile?alt=media')) {
+          return new Response(
+            JSON.stringify({ version: '1.0', updated_at: '2026-10-15T12:00:00.000Z', data: remoteProfile }),
+            { status: 200 },
+          )
+        }
+        return new Response('Unexpected request', { status: 500 })
+      }) as typeof fetch,
+    )
+
+    const result = await syncDriveReplica(profile, [])
+
+    expect(result.status).toBe('synced')
+    expect(methods.some((call) => call.startsWith('PATCH ') && call.includes('existing-profile'))).toBe(true)
+    expect(methods.filter((call) => call.startsWith('POST '))).toHaveLength(1)
+    expect(readDriveSyncQueue(storage)).toHaveLength(0)
+  })
+
+  it('keeps the retry queue when a Drive request fails', async () => {
+    const storage = createMemoryStorage()
+    storage.setItem(
+      GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+      JSON.stringify({ access_token: 'test-token', expires_at: Date.now() + 3_600_000 }),
+    )
+    vi.stubGlobal('window', { localStorage: storage, dispatchEvent: vi.fn() })
+    const queueEntry = enqueueDriveSync('workouts', [], storage)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('Drive unavailable', { status: 503 })) as typeof fetch,
+    )
+
+    await expect(syncDriveReplica(undefined, [])).rejects.toThrow('Drive unavailable')
+    expect(readDriveSyncQueue(storage)).toMatchObject([{ id: queueEntry.id }])
   })
 })

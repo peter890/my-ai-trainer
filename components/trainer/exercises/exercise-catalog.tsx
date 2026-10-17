@@ -1,43 +1,82 @@
 'use client'
 
 import { useState } from 'react'
-import { Ban, Search, Star } from 'lucide-react'
+import { Ban, Check, CircleCheck, CircleX, Pencil, Search, Star, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { filterExercisesByEquipment } from '@/lib/exercise-catalog'
 import { muscleGroups, type Exercise, type MuscleGroup } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
-type Filter = 'all' | 'favorite' | 'excluded'
+type Filter = 'all' | 'active' | 'inactive' | 'favorite' | 'excluded'
+type EquipmentFilter = 'all' | Exercise['equipment']
+
+const equipmentOptions: Exercise['equipment'][] = [
+  'Sztanga',
+  'Hantle',
+  'Wyciąg',
+  'Maszyna',
+  'Kalistenika',
+  'Kardio',
+]
 
 type Props = {
   exercises: Exercise[]
   onToggle: (id: string, key: 'favorite' | 'excluded') => void
+  onToggleActive: (id: string) => void
+  onSaveTechniqueNote: (id: string, note: string) => Promise<boolean>
 }
 
-export function ExerciseCatalog({ exercises, onToggle }: Props) {
+export function ExerciseCatalog({
+  exercises,
+  onToggle,
+  onToggleActive,
+  onSaveTechniqueNote,
+}: Props) {
   const [query, setQuery] = useState('')
   const [muscle, setMuscle] = useState<MuscleGroup | 'all'>('all')
   const [filter, setFilter] = useState<Filter>('all')
+  const [equipment, setEquipment] = useState<EquipmentFilter>('all')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
 
-  const visible = exercises.filter(
+  const visible = filterExercisesByEquipment(exercises, equipment).filter(
     (e) =>
       (muscle === 'all' || e.muscle === muscle) &&
-      (filter === 'all' || e[filter]) &&
+      (filter === 'all' ||
+        (filter === 'active' && e.active) ||
+        (filter === 'inactive' && !e.active) ||
+        (filter === 'favorite' && e.favorite) ||
+        (filter === 'excluded' && e.excluded)) &&
       e.name.toLowerCase().includes(query.trim().toLowerCase()),
   )
 
   const counts = {
     all: exercises.length,
+    active: exercises.filter((e) => e.active).length,
+    inactive: exercises.filter((e) => !e.active).length,
     favorite: exercises.filter((e) => e.favorite).length,
     excluded: exercises.filter((e) => e.excluded).length,
   }
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'Wszystkie' },
+    { id: 'active', label: 'Aktywne' },
+    { id: 'inactive', label: 'Nieaktywne' },
     { id: 'favorite', label: 'Ulubione' },
     { id: 'excluded', label: 'Wykluczone' },
   ]
+
+  const saveNote = async () => {
+    if (!editingNoteId) return
+    setSavingNote(true)
+    const saved = await onSaveTechniqueNote(editingNoteId, noteDraft)
+    setSavingNote(false)
+    if (saved) setEditingNoteId(null)
+  }
 
   return (
     <Card>
@@ -55,7 +94,7 @@ export function ExerciseCatalog({ exercises, onToggle }: Props) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="flex gap-1 rounded-xl bg-secondary/60 p-1" role="group" aria-label="Filtr statusu">
+          <div className="-mx-1 flex gap-1 overflow-x-auto rounded-xl bg-secondary/60 p-1" role="group" aria-label="Filtr statusu">
             {filters.map((f) => (
               <button
                 key={f.id}
@@ -63,7 +102,7 @@ export function ExerciseCatalog({ exercises, onToggle }: Props) {
                 onClick={() => setFilter(f.id)}
                 aria-pressed={filter === f.id}
                 className={cn(
-                  'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-colors',
+                  'flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors',
                   filter === f.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -91,6 +130,25 @@ export function ExerciseCatalog({ exercises, onToggle }: Props) {
               </button>
             ))}
           </div>
+
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Sprzęt">
+            {(['all', ...equipmentOptions] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setEquipment(option)}
+                aria-pressed={equipment === option}
+                className={cn(
+                  'h-8 shrink-0 rounded-full border px-3 text-xs font-medium transition-colors',
+                  equipment === option
+                    ? 'border-primary bg-primary/15 text-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {option === 'all' ? 'Każdy sprzęt' : option}
+              </button>
+            ))}
+          </div>
         </div>
 
         {visible.length === 0 ? (
@@ -103,48 +161,115 @@ export function ExerciseCatalog({ exercises, onToggle }: Props) {
               <li
                 key={e.id}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl border border-border bg-secondary/30 p-3 transition-colors',
+                  'flex flex-col gap-2 rounded-xl border border-border bg-secondary/30 p-3 transition-colors',
                   e.excluded && 'opacity-55',
+                  !e.active && 'opacity-50',
                   e.favorite && 'border-primary/30',
                 )}
               >
-                <div className="min-w-0 flex-1">
-                  <p className={cn('truncate text-sm font-medium', e.excluded && 'line-through')}>{e.name}</p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    {e.muscle} · {e.equipment}
-                    {e.custom && (
-                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                        Własne
-                      </Badge>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className={cn('truncate text-sm font-medium', (e.excluded || !e.active) && 'line-through')}>{e.name}</p>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {e.muscle} · {e.equipment}
+                      {e.custom && (
+                        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                          Własne
+                        </Badge>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onToggleActive(e.id)}
+                    aria-pressed={e.active}
+                    aria-label={`${e.active ? 'Dezaktywuj' : 'Aktywuj'} ćwiczenie: ${e.name}`}
+                    className={cn(
+                      'flex size-10 items-center justify-center rounded-lg transition-colors',
+                      e.active ? 'text-emerald-400 hover:bg-secondary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                     )}
-                  </p>
+                  >
+                    {e.active ? (
+                      <CircleCheck className="size-5" aria-hidden="true" />
+                    ) : (
+                      <CircleX className="size-5" aria-hidden="true" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggle(e.id, 'favorite')}
+                    aria-pressed={e.favorite}
+                    aria-label={`${e.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}: ${e.name}`}
+                    className={cn(
+                      'flex size-10 items-center justify-center rounded-lg transition-colors',
+                      e.favorite ? 'text-warning' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    <Star className={cn('size-5', e.favorite && 'fill-current')} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggle(e.id, 'excluded')}
+                    aria-pressed={e.excluded}
+                    aria-label={`${e.excluded ? 'Przywróć' : 'Wyklucz'}: ${e.name}`}
+                    className={cn(
+                      'flex size-10 items-center justify-center rounded-lg transition-colors',
+                      e.excluded
+                        ? 'bg-destructive/15 text-destructive'
+                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    <Ban className="size-5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingNoteId(e.id)
+                      setNoteDraft(e.techniqueNote)
+                    }}
+                    aria-label={`Edytuj notatkę techniczną: ${e.name}`}
+                    className="flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onToggle(e.id, 'favorite')}
-                  aria-pressed={e.favorite}
-                  aria-label={`${e.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}: ${e.name}`}
-                  className={cn(
-                    'flex size-10 items-center justify-center rounded-lg transition-colors',
-                    e.favorite ? 'text-warning' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                  )}
-                >
-                  <Star className={cn('size-5', e.favorite && 'fill-current')} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggle(e.id, 'excluded')}
-                  aria-pressed={e.excluded}
-                  aria-label={`${e.excluded ? 'Przywróć' : 'Wyklucz'}: ${e.name}`}
-                  className={cn(
-                    'flex size-10 items-center justify-center rounded-lg transition-colors',
-                    e.excluded
-                      ? 'bg-destructive/15 text-destructive'
-                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                  )}
-                >
-                  <Ban className="size-5" aria-hidden="true" />
-                </button>
+                {editingNoteId === e.id ? (
+                  <div className="flex flex-col gap-2">
+                    <Textarea
+                      value={noteDraft}
+                      onChange={(event) => setNoteDraft(event.target.value)}
+                      maxLength={2000}
+                      aria-label={`Notatka techniczna: ${e.name}`}
+                      placeholder="Dodaj wskazówki techniczne"
+                      className="min-h-20 text-sm"
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">{noteDraft.length}/2000</span>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingNoteId(null)}
+                          disabled={savingNote}
+                          aria-label="Anuluj edycję notatki"
+                          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary"
+                        >
+                          <X className="size-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void saveNote()}
+                          disabled={savingNote}
+                          aria-label="Zapisz notatkę techniczną"
+                          className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-60"
+                        >
+                          <Check className="size-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : e.techniqueNote ? (
+                  <p className="border-t border-border/70 pt-2 text-xs text-muted-foreground">{e.techniqueNote}</p>
+                ) : null}
               </li>
             ))}
           </ul>

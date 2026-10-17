@@ -68,12 +68,41 @@ export function toExerciseView(
   return {
     id: exercise.id,
     name: exercise.name,
+    active: exercise.active,
     muscle: labelByCategory[exercise.category],
     equipment: labelByEquipment[exercise.equipment],
+    restType: exercise.rest_type,
+    techniqueNote: exercise.technique_note,
     favorite: preferences.favorite_exercise_ids.includes(exercise.id),
     excluded: preferences.excluded_exercise_ids.includes(exercise.id),
     custom: exercise.custom,
   }
+}
+
+export function filterExercisesForPlan(exercises: ExerciseView[], skipExcluded: boolean): ExerciseView[] {
+  return exercises.filter((exercise) => exercise.active && !(skipExcluded && exercise.excluded))
+}
+
+export function getExerciseAlternatives(exercises: ExerciseView[], exerciseId: string): ExerciseView[] {
+  const exercise = exercises.find(({ id }) => id === exerciseId)
+  if (!exercise) return []
+
+  return exercises.filter(
+    (candidate) =>
+      candidate.id !== exerciseId &&
+      candidate.muscle === exercise.muscle &&
+      candidate.active &&
+      !candidate.excluded,
+  )
+}
+
+export function filterExercisesByEquipment(
+  exercises: ExerciseView[],
+  equipment: ExerciseView['equipment'] | 'all',
+): ExerciseView[] {
+  return equipment === 'all'
+    ? exercises
+    : exercises.filter((exercise) => exercise.equipment === equipment)
 }
 
 export function createExerciseRecord(draft: ExerciseDraft): Exercise {
@@ -101,11 +130,17 @@ export async function initializeExerciseCatalog(database?: Database): Promise<{
   ])
 
   if (count === 0) {
-    await Promise.all(builtInExercises.map((exercise) => exerciseStore.put(exercise)))
+    const updatedAt = new Date().toISOString()
+    await Promise.all(
+      builtInExercises.map((exercise) =>
+        exerciseStore.put(ExerciseSchema.parse({ ...exercise, updated_at: updatedAt })),
+      ),
+    )
   }
 
   if (!preferences) {
     const defaultPreferences: ExercisePreferencesInput = {
+      updated_at: new Date().toISOString(),
       excluded_exercise_ids: [],
       favorite_exercise_ids: [],
     }

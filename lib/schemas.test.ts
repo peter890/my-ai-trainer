@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ProfileDocumentSchema, WorkoutSchema } from './schemas'
+import { AiAnalysisFeedbackSchema, ProfileDocumentSchema, WorkoutSchema } from './schemas'
 
 const profile = {
   version: '1.0',
@@ -31,6 +31,7 @@ describe('ProfileDocumentSchema', () => {
     const result = ProfileDocumentSchema.parse(profile)
 
     expect(result.profile.injuries_notes).toBe('')
+    expect(result.settings.rest_timer_signal).toBe('vibrate')
   })
 
   it('rejects an API key so it cannot enter synchronized profile data', () => {
@@ -86,6 +87,17 @@ describe('WorkoutSchema', () => {
 
   it('accepts an active workout and defaults accumulated pause duration', () => {
     expect(WorkoutSchema.parse(workout).paused_duration_ms).toBe(0)
+  })
+
+  describe('AiAnalysisFeedbackSchema', () => {
+    it('accepts the 150-word response limit and rejects the next word', () => {
+      expect(AiAnalysisFeedbackSchema.safeParse(Array.from({ length: 150 }, () => 'słowo').join(' ')).success).toBe(
+        true,
+      )
+      expect(AiAnalysisFeedbackSchema.safeParse(Array.from({ length: 151 }, () => 'słowo').join(' ')).success).toBe(
+        false,
+      )
+    })
   })
 
   it('requires end_time for a workout awaiting finalization', () => {

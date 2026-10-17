@@ -13,15 +13,20 @@ type Props = {
 
 export function WeightHistoryCard({ weights, onAdd }: Props) {
   const [value, setValue] = useState('')
+  const [error, setError] = useState('')
   const min = Math.min(...weights.map((w) => w.weight))
   const max = Math.max(...weights.map((w) => w.weight))
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const parsed = Number(value.replace(',', '.'))
-    if (!Number.isFinite(parsed) || parsed < 30 || parsed > 300) return
+    if (!Number.isFinite(parsed) || parsed < 30 || parsed > 300) {
+      setError('Podaj prawidłową wagę z zakresu 30–300 kg.')
+      return
+    }
     onAdd(Math.round(parsed * 10) / 10)
     setValue('')
+    setError('')
   }
 
   return (
@@ -42,9 +47,14 @@ export function WeightHistoryCard({ weights, onAdd }: Props) {
             id="new-weight"
             inputMode="decimal"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => {
+              setValue(e.target.value)
+              setError('')
+            }}
             placeholder="Nowy pomiar, np. 81,2"
             className="h-11"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? 'new-weight-error' : undefined}
           />
           <button
             type="submit"
@@ -54,6 +64,7 @@ export function WeightHistoryCard({ weights, onAdd }: Props) {
             Dodaj
           </button>
         </form>
+        {error ? <p id="new-weight-error" role="alert" className="text-sm text-destructive">{error}</p> : null}
       </CardContent>
     </Card>
   )

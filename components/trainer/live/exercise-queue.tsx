@@ -1,10 +1,10 @@
 import { Check } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { LiveExercise, LoggedSet } from '@/lib/trainer-data'
+import type { LoggedSet } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
 type Props = {
-  exercises: LiveExercise[]
+  exercises: { id: string; name: string; targetSets: number; targetReps: string }[]
   setsByExercise: LoggedSet[][]
   activeIndex: number
   onSelect: (index: number) => void

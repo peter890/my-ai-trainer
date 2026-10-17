@@ -2,6 +2,7 @@ import type { IDBPDatabase } from 'idb'
 import {
   ExerciseSchema,
   ExercisePreferencesSchema,
+  LiveSessionSnapshotSchema,
   ProfileDocumentSchema,
   WorkoutPlanSchema,
   WorkoutSchema,
@@ -10,6 +11,7 @@ import {
   type ExerciseInput,
   type ExercisePreferences,
   type ExercisePreferencesInput,
+  type LiveSessionSnapshot,
   type ProfileDocument,
   type ProfileDocumentInput,
   type Workout,
@@ -42,10 +44,11 @@ export async function getProfile(database?: Database): Promise<ProfileDocument |
   return profile === undefined ? undefined : ProfileDocumentSchema.parse(profile)
 }
 
-export async function saveExercise(exercise: ExerciseInput, database?: Database): Promise<void> {
-  const validExercise = ExerciseSchema.parse(exercise)
+export async function saveExercise(exercise: ExerciseInput, database?: Database): Promise<Exercise> {
+  const validExercise = ExerciseSchema.parse({ ...exercise, updated_at: new Date().toISOString() })
   const db = await databaseOrDefault(database)
   await db.put('exercises', validExercise)
+  return validExercise
 }
 
 export async function getExercises(database?: Database): Promise<Exercise[]> {
@@ -58,6 +61,7 @@ export async function getExercisePreferences(database?: Database): Promise<Exerc
   const preferences = await db.get('exercise_preferences', 'current')
   return ExercisePreferencesSchema.parse(
     preferences ?? {
+      updated_at: new Date().toISOString(),
       excluded_exercise_ids: [],
       favorite_exercise_ids: [],
     },
@@ -68,7 +72,10 @@ export async function saveExercisePreferences(
   preferences: ExercisePreferencesInput,
   database?: Database,
 ): Promise<void> {
-  const validPreferences = ExercisePreferencesSchema.parse(preferences)
+  const validPreferences = ExercisePreferencesSchema.parse({
+    ...preferences,
+    updated_at: new Date().toISOString(),
+  })
   const db = await databaseOrDefault(database)
   await db.put('exercise_preferences', validPreferences, 'current')
 }
@@ -80,9 +87,14 @@ export async function deleteExercise(id: string, database?: Database): Promise<v
 }
 
 export async function savePlan(plan: WorkoutPlanInput, database?: Database): Promise<void> {
-  const validPlan = WorkoutPlanSchema.parse(plan)
+  await savePlans([plan], database)
+}
+
+export async function savePlans(plans: WorkoutPlanInput[], database?: Database): Promise<void> {
+  const validPlans = WorkoutPlanSchema.array().parse(plans)
   const db = await databaseOrDefault(database)
-  await db.put('plans', validPlan)
+  const transaction = db.transaction('plans', 'readwrite')
+  await Promise.all([...validPlans.map((plan) => transaction.store.put(plan)), transaction.done])
 }
 
 export async function getPlans(database?: Database): Promise<WorkoutPlan[]> {
@@ -97,7 +109,7 @@ export async function deletePlan(id: string, database?: Database): Promise<void>
 }
 
 export async function saveWorkout(workout: WorkoutInput, database?: Database): Promise<void> {
-  const validWorkout = WorkoutSchema.parse(workout)
+  const validWorkout = WorkoutSchema.parse({ ...workout, updated_at: new Date().toISOString() })
   const db = await databaseOrDefault(database)
   await db.put('workouts', validWorkout)
 
@@ -122,4 +134,24 @@ export async function deleteWorkout(id: string, database?: Database): Promise<vo
   const validId = EntityIdSchema.parse(id)
   const db = await databaseOrDefault(database)
   await db.delete('workouts', validId)
+}
+
+export async function saveLiveSessionSnapshot(
+  snapshot: LiveSessionSnapshot,
+  database?: Database,
+): Promise<void> {
+  const validSnapshot = LiveSessionSnapshotSchema.parse(snapshot)
+  const db = await databaseOrDefault(database)
+  await db.put('live_session', validSnapshot, 'current')
+}
+
+export async function getLiveSessionSnapshot(database?: Database): Promise<LiveSessionSnapshot | undefined> {
+  const db = await databaseOrDefault(database)
+  const snapshot = await db.get('live_session', 'current')
+  return snapshot === undefined ? undefined : LiveSessionSnapshotSchema.parse(snapshot)
+}
+
+export async function deleteLiveSessionSnapshot(database?: Database): Promise<void> {
+  const db = await databaseOrDefault(database)
+  await db.delete('live_session', 'current')
 }

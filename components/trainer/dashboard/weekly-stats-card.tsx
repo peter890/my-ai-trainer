@@ -1,19 +1,34 @@
 import { ChevronRight } from 'lucide-react'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { WorkoutDashboardStats } from '@/lib/schemas'
+import { numberFormat } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-const stats = [
-  { label: 'Objętość', value: '12 550', unit: 'kg', change: '+4%' },
-  { label: 'Czas', value: '3 h 02', unit: 'min', change: '+12 min' },
-  { label: 'Serie', value: '58', unit: '', change: '+3' },
-  { label: 'Rekordy', value: '2', unit: 'PR', change: 'nowe' },
-]
+export function WeeklyStatsCard({
+  stats,
+  onOpenHistory,
+  className,
+}: {
+  stats: WorkoutDashboardStats | null
+  onOpenHistory: () => void
+  className?: string
+}) {
+  const values = [
+    {
+      label: 'Objętość',
+      value: stats ? numberFormat.format(Math.round(stats.current_week.volume_kg)) : '—',
+      unit: 'kg',
+    },
+    { label: 'Czas', value: stats ? String(stats.current_week.duration_minutes) : '—', unit: 'min' },
+    { label: 'Serie', value: stats ? String(stats.current_week.set_count) : '—', unit: '' },
+    { label: 'Treningi', value: stats ? String(stats.current_week.workout_count) : '—', unit: '' },
+  ]
 
-export function WeeklyStatsCard({ onOpenHistory, className }: { onOpenHistory: () => void; className?: string }) {
   return (
     <Card className={cn(className)}>
       <CardHeader>
         <CardTitle className="font-semibold">Ten tydzień</CardTitle>
+        <p className="text-xs text-muted-foreground">Tydzień kalendarzowy (poniedziałek–niedziela)</p>
         <CardAction>
           <button
             type="button"
@@ -27,13 +42,12 @@ export function WeeklyStatsCard({ onOpenHistory, className }: { onOpenHistory: (
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-2 gap-3">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-xl bg-secondary/50 p-3">
-              <dt className="text-xs text-muted-foreground">{s.label}</dt>
+          {values.map((item) => (
+            <div key={item.label} className="rounded-xl bg-secondary/50 p-3">
+              <dt className="text-xs text-muted-foreground">{item.label}</dt>
               <dd className="mt-1">
-                <span className="text-lg font-semibold tabular-nums">{s.value}</span>
-                {s.unit && <span className="ml-1 text-xs text-muted-foreground">{s.unit}</span>}
-                <span className="block text-xs text-primary">{s.change}</span>
+                <span className="text-lg font-semibold tabular-nums">{item.value}</span>
+                {item.unit && <span className="ml-1 text-xs text-muted-foreground">{item.unit}</span>}
               </dd>
             </div>
           ))}

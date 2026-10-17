@@ -2,7 +2,7 @@
 
 Plan opiera się na weryfikacji `docs/TEMPLATE_AUDIT.md` względem aktualnego kodu oraz `docs/PRD.md`. Jest to plan do wznawiania pracy: wymagania mają stałe identyfikatory i pola wyboru, a ukończenie etapu wymaga spełnienia kryteriów akceptacji.
 
-**Postęp na 14.10.2026:** Etap 0 i 1 zakończone. Etap 2 ma gotowe schematy, repozytoria, migrację IndexedDB i testy; trwa podłączanie pozostałych widoków. Z etapu 3 działają już katalog ćwiczeń i lokalne ustawienie Gemini.
+**Postęp na 16.10.2026:** Etapy 0–3 zakończone; etap 4 jest w toku. W etapie 8 ukończono synchronizację, kopie zapasowe i testy integracji, natomiast instalacja/offline PWA oraz jej weryfikacja na przeglądarkach pozostają otwarte.
 
 ## Status i reguły kontynuacji
 
@@ -84,16 +84,16 @@ Status etapu: **w toku — schematy, repozytoria, migracja IndexedDB i testy got
 ### Etap 3 — Profil, ustawienia i katalog ćwiczeń
 
 Zależność: etap 2.
-Status etapu: **w toku — klucz Gemini i katalog ćwiczeń są lokalne; profil biomedyczny nadal korzysta z prototypowego stanu**
+Status etapu: **[x] zakończony**
 
-- `[ ] E3.1` Podłączyć formularze profilu do repozytorium: płeć, wiek, wzrost, poziom, cel, urazy/uwagi oraz historia pomiarów wagi.
+- `[x] E3.1` Podłączyć formularze profilu do repozytorium: płeć, wiek, wzrost, poziom, cel, urazy/uwagi oraz historia pomiarów wagi.
 - `[x] E3.2` Zapisywać klucz Gemini wyłącznie lokalnie, umożliwić jego usunięcie i testować połączenie bezpośrednio z API (klucz przesyłany nagłówkiem; brak logowania). Test automatyczny mockuje odpowiedź API; test na prawdziwym koncie wymaga klucza użytkownika.
 - `[x] E3.3a` Podłączyć katalog wbudowany i dodawanie ćwiczeń własnych do IndexedDB; utrwalać preferencje ulubionych i wykluczonych.
-- `[ ] E3.3b` Dodać osobny stan aktywności ćwiczenia i dopiąć go do filtrowania oraz generowania planów.
+- `[x] E3.3b` Dodać osobny stan aktywności ćwiczenia i dopiąć go do filtrowania oraz generowania planów. Migracja IndexedDB ustawia wcześniejsze ćwiczenia jako aktywne.
 - `[x] E3.4a` Ujednolicić listę sprzętu zgodnie z PRD i zapisać `rest_type` dla nowych ćwiczeń.
-- `[ ] E3.4b` Dodać filtr sprzętu, edycję stałej notatki technicznej i pełne dane do zamiany ćwiczeń.
+- `[x] E3.4b` Dodać filtr sprzętu, edycję stałej notatki technicznej i pełne dane do zamiany ćwiczeń. Kandydaci do zamiany mają kompletną metadaną ćwiczenia i są ograniczeni do aktywnych, niewykluczonych ćwiczeń tej samej partii.
 - `[x] E3.5a` Dodać testy walidacji i trwałości katalogu ćwiczeń oraz preferencji.
-- `[ ] E3.5b` Dodać walidację i testy zapisu/edycji profilu oraz wagi.
+- `[x] E3.5b` Dodać walidację i testy zapisu/edycji profilu oraz wagi.
 
 **Kryterium akceptacji:** profil i katalog przetrwają przeładowanie/offline, wartości UI odpowiadają typowanym danym, a preferencje wpływają na propozycje planu i ćwiczeń.
 
@@ -101,12 +101,12 @@ Status etapu: **w toku — klucz Gemini i katalog ćwiczeń są lokalne; profil 
 
 Zależność: etapy 2–3.
 
-- `[ ] E4.1` Utrwalać edytowalne plany treningowe i umożliwić rozpoczęcie sesji z wybranego planu.
-- `[ ] E4.2` Zastąpić `liveWorkoutPlan` fixture’em pobieranym z planu/bazy i obsłużyć brak planu oraz pusty katalog.
-- `[ ] E4.3` Zaimplementować Smart Fill na podstawie poprzedniej serii bieżącej sesji lub ostatniego historycznego wykonania tego ćwiczenia.
-- `[ ] E4.4` Ustalać przerwę na podstawie `rest_type` i ustawień użytkownika; wspierać pominięcie i korektę czasu.
-- `[ ] E4.5` Dodać notatkę podczas ćwiczenia i edycję/usuwanie zalogowanej serii; pola liczbowe muszą umożliwiać pustą wartość w trakcie edycji i poprawne liczby dziesiętne.
-- `[ ] E4.6` Zamiana on-the-fly ma wybierać alternatywę z tej samej partii, uwzględniać wykluczenia i wczytywać historię wybranego ćwiczenia.
+- `[x] E4.1` Utrwalać edytowalne plany treningowe i umożliwić rozpoczęcie sesji z wybranego planu. Generator zapisuje treningi do IndexedDB, zapisane plany można edytować, a pulpit pozwala wybrać konkretny plan do startu.
+- `[x] E4.2` Zastąpić `liveWorkoutPlan` fixture’em pobieranym z planu/bazy i obsłużyć brak planu oraz pusty katalog; wznowienie wymaga jednoznacznego planu, nie tworzy ćwiczeń-placeholderów, a nieodtwarzalną sesję można zakończyć z zachowaniem zapisanych serii.
+- `[x] E4.3` Uzupełniać ciężar i powtórzenia ostatnią serią bieżącej sesji lub najnowszym wykonaniem historycznym; wznowienie odtwarza zapisane serie.
+- `[x] E4.4` Ustalać przerwę na podstawie `rest_type` i zapisanych ustawień profilu; umożliwiać pominięcie, korektę czasu podczas treningu i edycję domyślnych przerw w profilu.
+- `[x] E4.5` Dodać i odtwarzać notatkę podczas ćwiczenia oraz umożliwić edycję/usuwanie zalogowanej serii; pola robocze pozwalają na pusty wpis, a walidacja obsługuje dziesiętne ciężary i całkowite powtórzenia.
+- `[x] E4.6` Zamiana on-the-fly wybiera aktywną, niewykluczoną alternatywę tej samej partii, zmienia tylko ćwiczenie bez zapisanych serii i ładuje jego własną historię oraz sugestię Smart Fill.
 
 **Kryterium akceptacji:** wszystkie zmiany ćwiczeń i serii aktualizują jedną sesję, są walidowane i zachowują notatki oraz wartości; brak fikcyjnych alternatyw.
 
@@ -114,12 +114,12 @@ Zależność: etapy 2–3.
 
 Zależność: etapy 2 i 4.
 
-- `[ ] E5.1` Utrwalać aktywną sesję w IndexedDB przy zmianach stanu; po odświeżeniu/ponownym otwarciu odtworzyć ćwiczenie, serie, draft i stan przerwy.
-- `[ ] E5.2` Wyliczać czas treningu i przerwy z `Date.now()`/timestampów, nie z akumulacji tyknięć `setInterval`.
-- `[ ] E5.3` Obsłużyć start, pauzę (jeśli zachowana), wznowienie, minimalizację i jawne zakończenie z potwierdzeniem; nie kończyć sesji przypadkowo przy przejściu do kolejnego ćwiczenia.
-- `[ ] E5.4` Dodać Screen Wake Lock z obsługą braku API, widoczności karty i ponownego uzyskania blokady po powrocie.
-- `[ ] E5.5` Dodać sygnał zakończenia przerwy (wibracja/dźwięk według możliwości i preferencji), z bezpiecznym działaniem przy wyciszeniu/braku uprawnień.
-- `[ ] E5.6` Testować przejścia stanu i obliczenia czasu, w tym uśpienie karty, pauzę, wznowienie i koniec przerwy.
+- `[x] E5.1` Utrwalać lokalny snapshot aktywnej sesji w osobnym store IndexedDB (bez synchronizacji snapshotu do Drive); po odświeżeniu odtwarzać wybrane ćwiczenie, serie, draft, pauzę oraz przerwę.
+- `[x] E5.2` Wyliczać czas treningu z czasu bazowego i znacznika wznowienia, a przerwę z terminu jej zakończenia; interwał służy wyłącznie do odświeżania widoku. Po powrocie z uśpienia upływ korygują timestampy.
+- `[x] E5.3` Obsłużyć start, pauzę, wznowienie i minimalizację; zakończenie treningu wymaga potwierdzenia, a przejście do kolejnego ćwiczenia go nie kończy.
+- `[x] E5.4` Dodać Screen Wake Lock z obsługą braku API, widoczności karty i ponownego uzyskania blokady po powrocie; brak wsparcia nie blokuje treningu i jest komunikowany w UI.
+- `[x] E5.5` Dodać opcjonalną, domyślnie włączoną wibrację po zakończeniu przerwy, możliwość wyłączenia jej w profilu oraz bezpieczną obsługę braku/odmowy API.
+- `[x] E5.6` Testować wyliczanie czasu treningu/przerwy na granicach pauzy i wznowienia oraz jednokrotne wyzwalanie sygnału po upływie przerwy.
 
 **Kryterium akceptacji:** aktywna sesja nie ginie po przeładowaniu; mierzone czasy wynikają z timestampów i pozostają prawidłowe po uśpieniu karty.
 
@@ -127,12 +127,12 @@ Zależność: etapy 2 i 4.
 
 Zależność: etapy 2, 3 i 5.
 
-- `[ ] E6.1` Zapisywać zakończoną na siłowni sesję lokalnie jako wymagającą finalizacji; obsłużyć wiele oczekujących sesji.
-- `[ ] E6.2` Dodać ankietę energii 1–5 i uwagi użytkownika z walidacją oraz wznowieniem później.
-- `[ ] E6.3` Utworzyć moduł Gemini używający modelu z `lib/config.ts`; wysyłać tylko wymagany kontekst i wyłącznie po jasnej informacji/zgodzie użytkownika.
-- `[ ] E6.4` Obsłużyć brak sieci, błędny/nieobecny klucz, limity i błędy API bez utraty finalizacji; udostępnić ponowienie.
-- `[ ] E6.5` Ujednolicić kontrakt odpowiedzi z decyzją D-02; walidować dane odpowiedzi Zod i wyświetlać w istniejącej karcie.
-- `[ ] E6.6` Dodać testy promptu, sanitacji kontekstu, walidacji wyniku i przepływu błędów; nigdy nie logować klucza.
+- `[x] E6.1` Zapisywać zakończoną sesję lokalnie jako oczekującą na finalizację i obsłużyć kolejkę wielu treningów oczekujących na pulpicie.
+- `[x] E6.2` Zapisywać ankietę energii 1–5 i uwagi użytkownika z walidacją, automatycznym zapisem i możliwością późniejszego wznowienia; pozwolić zapisać trening bez analizy AI.
+- `[x] E6.3` Utworzyć moduł Gemini używający modelu z `lib/config.ts`; wysyłać tylko wymagany kontekst i wyłącznie po jasnej informacji/zgodzie użytkownika.
+- `[x] E6.4` Obsłużyć brak sieci, błędny/nieobecny klucz, limity i błędy API bez utraty finalizacji; udostępnić ponowienie.
+- `[x] E6.5` Ujednolicić kontrakt odpowiedzi z decyzją D-02; walidować dane odpowiedzi Zod i wyświetlać w istniejącej karcie.
+- `[x] E6.6` Dodać testy promptu, sanitacji kontekstu, walidacji wyniku i przepływu błędów; nigdy nie logować klucza.
 
 **Kryterium akceptacji:** sesję da się sfinalizować offline; analiza nie jest wymagana do zapisu; odpowiedź AI jest przypisana do treningu i odporna na błędy sieci.
 
@@ -140,8 +140,8 @@ Zależność: etapy 2, 3 i 5.
 
 Zależność: etapy 2–6.
 
-- `[ ] E7.1` Podłączyć kalendarz, listę i szczegóły do rzeczywistych treningów; obsłużyć wiele treningów jednego dnia i daty z rokiem.
-- `[ ] E7.2` Wyliczać streak, tygodniowe statystyki i tonaż z historii, bez wartości wpisanych na sztywno.
+- `[x] E7.1` Podłączyć kalendarz, listę i szczegóły do rzeczywistych treningów; obsłużyć wiele treningów jednego dnia i daty z rokiem.
+- `[x] E7.2` Wyliczać streak, tygodniowe statystyki i tonaż z historii, bez wartości wpisanych na sztywno.
 - `[ ] E7.3` Podłączyć wykres wagi i tonażu do pomiarów oraz sesji; dodać wykres progresji siłowej z jasno opisaną metodą obliczeń.
 - `[ ] E7.4` Zastąpić lokalny generator planów prawdziwą generacją Gemini, zapisywać plan, filtrować według profilu/ulubionych/wykluczonych i umożliwić jego start.
 - `[ ] E7.5` Dodać testy agregacji, granic tygodnia/miesiąca/roku, wielu sesji na dzień i obliczeń progresu.
@@ -155,11 +155,11 @@ Zależność: etapy 1–3; synchronizację uruchomić dopiero po stabilizacji sc
 - `[ ] E8.1` Dodać poprawne ikony instalacyjne PNG 192×192 i 512×512, zweryfikować manifest i metadane PWA.
 - `[ ] E8.2` Dodać service worker z cache zasobów aplikacji i strategią offline; nie cache’ować klucza ani wrażliwych odpowiedzi.
 - `[ ] E8.3` Przetestować instalację, start offline i aktualizację service workera na docelowych przeglądarkach; potwierdzić zachowanie hostingu z D-03.
-- `[ ] E8.4` Zaimplementować Google OAuth i Drive AppData bez własnego backendu; token tylko w pamięci zgodnie z zatwierdzonym przepływem.
-- `[ ] E8.5` Synchronizować wersjonowane dane z kolejką zmian offline, wykrywaniem konfliktów i jawnymi stanami błędu/ponowienia.
-- `[ ] E8.6` Dodać eksport/import kopii zapasowej oraz usuwanie danych; walidować każdy import schematem Zod.
-- `[ ] E8.7` Usunąć z UI obietnice niemożliwe/nieudokumentowane przez API, m.in. dokładne wykorzystanie miejsca Drive i warunek „tylko przez Wi-Fi”.
-- `[ ] E8.8` Testować OAuth, uprawnienia, brak sieci, konflikt, wylogowanie/wygaśnięcie tokenu, eksport/import i ochronę klucza.
+- `[x] E8.4` Zaimplementować Google OAuth i Drive AppData bez własnego backendu. Krótkotrwały access token jest przechowywany w localStorage do wygaśnięcia; po wygaśnięciu wymagane jest ponowne połączenie.
+- `[x] E8.5` Synchronizować wersjonowane dane z kolejką zmian offline, wykrywaniem konfliktów i jawnymi stanami błędu/ponowienia. Synchronizacja jest uruchamiana ręcznie z profilu; błędy nie czyszczą kolejki, a konflikt nie nadpisuje repliki.
+- `[x] E8.6` Dodać eksport/import kopii zapasowej oraz usuwanie danych; walidować każdy import schematem Zod. Import scala dane po ID i zachowuje nowszy rekord według `updated_at` (remisy zachowują dane lokalne); klucz Gemini nie jest eksportowany.
+- `[x] E8.7` Usunąć z UI obietnice niemożliwe/nieudokumentowane przez API, m.in. dokładne wykorzystanie miejsca Drive i warunek „tylko przez Wi-Fi”. Przegląd kart profilu potwierdził, że UI nie deklaruje tych funkcji.
+- `[x] E8.8` Testować OAuth, uprawnienia, brak sieci, konflikt, wylogowanie/wygaśnięcie tokenu, eksport/import i ochronę klucza.
 
 **Kryterium akceptacji:** podstawowe funkcje działają bez logowania i połączenia; Drive jest repliką, nie jedynym źródłem danych; konflikty i błędy są widoczne, a klucz Gemini nigdy nie trafia do synchronizacji.
 

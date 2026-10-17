@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BatteryFull,
   BatteryLow,
@@ -20,12 +20,13 @@ import { numberFormat } from '@/lib/format'
 import { getGeminiApiKey } from '@/lib/local-secrets'
 import { getProfile, getWorkouts, saveWorkout } from '@/lib/repositories'
 import type { Workout, WorkoutInput } from '@/lib/schemas'
+import { createWorkoutSurveyUpdate, getPendingFinalizationWorkouts } from '@/lib/post-workout'
 import { cn } from '@/lib/utils'
 import { AiFeedbackCard } from './ai-feedback-card'
 
 const energyLabels = ['Wyczerpany', 'Zmęczony', 'W normie', 'Dobrze', 'Świetnie']
 
-type Status = 'idle' | 'loading' | 'done' | 'error'
+type Status = 'idle' | 'loading' | 'saving' | 'done' | 'saved' | 'error'
 
 function getWorkoutSummary(workout: Workout) {
   const volume = workout.exercises.reduce(
@@ -57,23 +58,32 @@ function getWorkoutSummary(workout: Workout) {
 export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => void }) {
   const [energy, setEnergy] = useState(3)
   const [notes, setNotes] = useState('')
+  const [consentToGemini, setConsentToGemini] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [analysisText, setAnalysisText] = useState('')
   const [error, setError] = useState('')
-  const [workout, setWorkout] = useState<Workout | null>(null)
+  const [loadError, setLoadError] = useState('')
+  const [answerSaveError, setAnswerSaveError] = useState('')
+  const [pendingWorkouts, setPendingWorkouts] = useState<Workout[]>([])
+  const saveQueue = useRef(Promise.resolve())
+  const workout = pendingWorkouts[0] ?? null
 
   useEffect(() => {
     let active = true
 
     void getWorkouts().then((workouts) => {
       if (!active) return
-      const pendingWorkout = [...workouts]
-        .filter((item) => item.status === 'pending_finalization')
-        .sort((a, b) => Date.parse(b.start_time) - Date.parse(a.start_time))[0]
-
-      setWorkout(pendingWorkout ?? null)
-      if (pendingWorkout) {
-        setNotes(pendingWorkout.post_workout_user_notes ?? '')
+      const pending = getPendingFinalizationWorkouts(workouts)
+      setPendingWorkouts(pending)
+      if (pending[0]) {
+        setEnergy(pending[0].readiness_energy_score ?? 3)
+        setNotes(pending[0].post_workout_user_notes ?? '')
+      }
+    }).catch((cause: unknown) => {
+      if (active) {
+        setLoadError(
+          cause instanceof Error ? cause.message : 'Nie udało się wczytać treningów do finalizacji.',
+        )
       }
     })
 
@@ -82,13 +92,39 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
     }
   }, [])
 
+  useEffect(() => {
+    if (!workout || status === 'loading' || status === 'saving' || status === 'done' || status === 'saved') return
+
+    const timeout = window.setTimeout(() => {
+      const updatedWorkout = createWorkoutSurveyUpdate(workout, energy, notes)
+      const save = saveQueue.current.catch(() => undefined).then(() => saveWorkout(updatedWorkout))
+      saveQueue.current = save.then(() => undefined, () => undefined)
+      void save.then(() => setAnswerSaveError('')).catch((cause: unknown) => {
+        setAnswerSaveError(cause instanceof Error ? cause.message : 'Nie udało się zapisać ankiety.')
+      })
+    }, 300)
+
+    return () => window.clearTimeout(timeout)
+  }, [energy, notes, status, workout])
+
+  const saveSurvey = async () => {
+    if (!workout) return undefined
+    await saveQueue.current
+    const updatedWorkout = createWorkoutSurveyUpdate(workout, energy, notes)
+    await saveWorkout(updatedWorkout)
+    setAnswerSaveError('')
+    return updatedWorkout
+  }
+
   const finalize = async () => {
-    if (!workout) return
+    if (!workout || !consentToGemini) return
 
     setStatus('loading')
     setError('')
 
     try {
+      const surveyWorkout = await saveSurvey()
+      if (!surveyWorkout) return
       const apiKey = getGeminiApiKey()
       if (!apiKey) {
         throw new Error('Brakuje klucza API Gemini. Dodaj go w profilu, aby wygenerować analizę.')
@@ -104,13 +140,11 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
         ),
       ])
 
-      const analysis = await generateWorkoutAnalysis(workout, profile, recentWorkouts, apiKey)
+      const analysis = await generateWorkoutAnalysis(surveyWorkout, profile, recentWorkouts, apiKey)
       const finalizedWorkout: WorkoutInput = {
-        ...workout,
+        ...surveyWorkout,
         status: 'completed',
         end_time: workout.end_time ?? new Date().toISOString(),
-        readiness_energy_score: energy,
-        post_workout_user_notes: notes.trim() || undefined,
         ai_analysis: {
           generated_at: new Date().toISOString(),
           feedback_text: analysis.feedback_text,
@@ -126,8 +160,51 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
     }
   }
 
+  const completeWithoutAnalysis = async () => {
+    if (!workout || status === 'loading' || status === 'saving') return
+    setStatus('saving')
+    setError('')
+
+    try {
+      const surveyWorkout = await saveSurvey()
+      if (!surveyWorkout) return
+      await saveWorkout({
+        ...surveyWorkout,
+        status: 'completed',
+        end_time: workout.end_time ?? new Date().toISOString(),
+      })
+      setAnalysisText('')
+      setStatus('saved')
+    } catch (cause) {
+      setStatus('error')
+      setError(cause instanceof Error ? cause.message : 'Nie udało się zapisać treningu.')
+    }
+  }
+
+  const archiveCurrentWorkout = () => {
+    if (!workout || (status !== 'done' && status !== 'saved')) return
+    const remaining = pendingWorkouts.slice(1)
+    setPendingWorkouts(remaining)
+    if (remaining.length === 0) {
+      onFinalized()
+      return
+    }
+
+    setEnergy(remaining[0]?.readiness_energy_score ?? 3)
+    setNotes(remaining[0]?.post_workout_user_notes ?? '')
+    setConsentToGemini(false)
+    setStatus('idle')
+    setAnalysisText('')
+    setError('')
+    setAnswerSaveError('')
+  }
+
   if (!workout) {
-    return null
+    return loadError ? (
+      <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+        Nie udało się wczytać treningów do finalizacji: {loadError}
+      </p>
+    ) : null
   }
 
   const summary = getWorkoutSummary(workout)
@@ -142,11 +219,16 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
             </div>
             <div>
               <h2 id="finalize-title" className="font-semibold">
-                Niesfinalizowany trening z dziś
+                Niesfinalizowany trening
               </h2>
               <p className="text-sm text-muted-foreground">
                 {summary.title} · {summary.date}
               </p>
+              {pendingWorkouts.length > 1 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Trening {1} z {pendingWorkouts.length} do finalizacji
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -157,7 +239,7 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
             <Stat icon={Trophy} label="Rekordy" value={`${summary.prs} PR`} accent />
           </dl>
 
-          <fieldset disabled={status === 'loading' || status === 'done'}>
+          <fieldset disabled={status === 'loading' || status === 'saving' || status === 'done' || status === 'saved'}>
             <legend className="mb-2 text-sm font-medium">Poziom energii po treningu</legend>
             <div className="grid grid-cols-5 gap-2">
               {[1, 2, 3, 4, 5].map((value) => {
@@ -192,18 +274,50 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
               id="workout-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              disabled={status === 'loading' || status === 'done'}
+              maxLength={4000}
+              disabled={status === 'loading' || status === 'saving' || status === 'done' || status === 'saved'}
               placeholder="Np. ból nadgarstka przy wyciskaniu, zadyszka na bieżni…"
               className="min-h-24 resize-none"
             />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
+          {answerSaveError ? (
+            <p role="alert" className="text-sm text-destructive">
+              Nie udało się automatycznie zapisać ankiety: {answerSaveError}
+            </p>
+          ) : null}
+
+          <label
+            htmlFor="gemini-consent"
+            className="flex items-start gap-3 rounded-xl border border-border bg-secondary/30 p-3 text-sm"
+          >
+            <input
+              id="gemini-consent"
+              type="checkbox"
+              checked={consentToGemini}
+              onChange={(event) => setConsentToGemini(event.target.checked)}
+              disabled={status === 'loading' || status === 'saving' || status === 'done' || status === 'saved'}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+            />
+            <span className="text-muted-foreground">
+              Zgadzam się wysłać do Google Gemini dane tej sesji (plan, ćwiczenia, serie i czas), ankietę energii i
+              notatki, dane profilu (płeć, wiek, wzrost, aktualna waga, cel, poziom i wykluczone ćwiczenia) oraz
+              podsumowania maksymalnie 3 ostatnich treningów. Klucz API jest przechowywany lokalnie, używany wyłącznie do
+              tego żądania i nie trafia do historii ani synchronizacji Drive.
+            </span>
+          </label>
 
           <button
             type="button"
             onClick={() => void finalize()}
-            disabled={status === 'loading' || status === 'done'}
+            disabled={
+              !consentToGemini ||
+              status === 'loading' ||
+              status === 'saving' ||
+              status === 'done' ||
+              status === 'saved'
+            }
             className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-base font-semibold text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
           >
             {status === 'loading' ? (
@@ -211,8 +325,15 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
                 Gemini analizuje trening…
               </>
+            ) : status === 'saving' ? (
+              <>
+                <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+                Zapisywanie treningu…
+              </>
             ) : status === 'done' ? (
               'Trening sfinalizowany'
+            ) : status === 'saved' ? (
+              'Trening zapisany'
             ) : status === 'error' ? (
               <>
                 <Sparkles className="size-5" aria-hidden="true" />
@@ -225,6 +346,16 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
               </>
             )}
           </button>
+          {status !== 'done' && status !== 'saved' ? (
+            <button
+              type="button"
+              onClick={() => void completeWithoutAnalysis()}
+              disabled={status === 'loading' || status === 'saving'}
+              className="flex h-11 w-full items-center justify-center rounded-xl border border-border bg-secondary/40 px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
+            >
+              Zapisz trening bez analizy AI
+            </button>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -232,7 +363,7 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
         status={status}
         analysisText={analysisText}
         errorText={error}
-        onArchive={onFinalized}
+        onArchive={archiveCurrentWorkout}
         onRetry={() => void finalize()}
       />
     </section>

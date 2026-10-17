@@ -1,12 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { Ban, CalendarDays, Loader2, Sparkles, Star } from 'lucide-react'
+import { Ban, CalendarDays, Loader2, Save, Sparkles, Star } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { filterExercisesForPlan } from '@/lib/exercise-catalog'
+import { createWorkoutPlan } from '@/lib/plan-builder'
+import { savePlans } from '@/lib/repositories'
 import type { Exercise, MuscleGroup } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
+import { SavedPlans } from './saved-plans'
 
 const goals = ['Hipertrofia', 'Siła', 'Redukcja', 'Kondycja'] as const
 const levels = ['Początkujący', 'Średni', 'Zaawansowany'] as const
@@ -64,12 +68,18 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
   const [skipExcluded, setSkipExcluded] = useState(true)
   const [loading, setLoading] = useState(false)
   const [plan, setPlan] = useState<PlanDay[] | null>(null)
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [plansRevision, setPlansRevision] = useState(0)
 
   const generate = () => {
     setLoading(true)
     setPlan(null)
+    setError('')
+    setMessage('')
     const perDay = Math.max(3, Math.round(length / 15))
-    const pool = exercises.filter((e) => !(skipExcluded && e.excluded))
+    const pool = filterExercisesForPlan(exercises, skipExcluded)
 
     setTimeout(() => {
       setPlan(
@@ -92,12 +102,48 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
     }, 1400)
   }
 
+  const saveGeneratedPlan = async () => {
+    if (!plan || plan.some((day) => day.exercises.length === 0)) {
+      setError('Każdy dzień planu musi zawierać co najmniej jedno ćwiczenie.')
+      return
+    }
+
+    setSavingPlan(true)
+    setError('')
+    setMessage('')
+    const timestamp = new Date().toISOString()
+
+    try {
+      const savedPlans = plan.map((day) =>
+        createWorkoutPlan(
+          {
+            name: day.name,
+            exercises: day.exercises.map((exercise) => ({
+              id: exercise.id,
+              restType: exercise.restType,
+              scheme: exercise.scheme,
+            })),
+          },
+          `plan-${crypto.randomUUID()}`,
+          timestamp,
+        ),
+      )
+      await savePlans(savedPlans)
+      setMessage(`Zapisano plan tygodniowy (${savedPlans.length} treningów).`)
+      setPlansRevision((current) => current + 1)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Nie udało się zapisać planu.')
+    } finally {
+      setSavingPlan(false)
+    }
+  }
+
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-6">
       <Card className="lg:sticky lg:top-6">
         <CardHeader>
           <CardTitle className="font-semibold">Parametry planu</CardTitle>
-          <CardDescription>Gemini dobierze ćwiczenia na podstawie Twojego profilu.</CardDescription>
+          <CardDescription>Dobór ćwiczeń uwzględnia cel, czas oraz ulubione i wykluczone pozycje.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           <Pills label="Cel" options={goals} value={goal} onChange={setGoal} />
@@ -205,7 +251,27 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
             </div>
           </div>
         )}
+        {plan ? (
+          <div className="mt-4 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => void saveGeneratedPlan()}
+              disabled={savingPlan}
+              className="flex h-11 items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-medium text-primary hover:bg-primary/15 disabled:cursor-wait disabled:opacity-60"
+            >
+              {savingPlan ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Save className="size-4" aria-hidden="true" />
+              )}
+              Zapisz plan tygodniowy
+            </button>
+            {message ? <p role="status" className="text-sm text-emerald-300">{message}</p> : null}
+            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          </div>
+        ) : null}
       </section>
+      <SavedPlans exercises={exercises} refreshKey={plansRevision} />
     </div>
   )
 }

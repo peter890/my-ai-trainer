@@ -10,7 +10,7 @@ import {
   getDriveSyncQueueLength,
   hasGoogleDriveClientId,
   isGoogleDriveConnected,
-  restoreGoogleDriveConnection,
+  subscribeToDriveSyncQueue,
   subscribeToGoogleDriveToken,
   syncDriveReplica,
 } from '@/lib/google-drive'
@@ -26,33 +26,32 @@ export function DriveSyncCard() {
 
   useEffect(() => {
     const syncState = () => {
-      const connected = isGoogleDriveConnected()
-      setStatus(connected ? 'connected' : 'idle')
-      setQueueLength(getDriveSyncQueueLength())
-      setMessage(createDriveSyncSummary())
-      setError('')
+      try {
+        const connected = isGoogleDriveConnected()
+        setStatus(connected ? 'connected' : 'idle')
+        setQueueLength(getDriveSyncQueueLength())
+        setMessage(createDriveSyncSummary())
+        setError('')
+      } catch (cause) {
+        setStatus('error')
+        setError(cause instanceof Error ? cause.message : 'Nie można odczytać kolejki synchronizacji.')
+        setMessage('Nie można odczytać kolejki synchronizacji Google Drive.')
+      }
     }
 
-    let active = true
     syncState()
-
-    const unsubscribe = subscribeToGoogleDriveToken(syncState)
-    if (hasGoogleDriveClientId() && !isGoogleDriveConnected()) {
-      void restoreGoogleDriveConnection()
-        .then(() => {
-          if (active) syncState()
-        })
-        .catch((cause) => {
-          if (!active) return
-          setStatus('error')
-          setError(cause instanceof Error ? cause.message : 'Nie udało się przywrócić połączenia z Google Drive.')
-          setMessage('Nie udało się przywrócić połączenia z Google Drive.')
-        })
-    }
-
+    const unsubscribeToken = subscribeToGoogleDriveToken(syncState)
+    const unsubscribeQueue = subscribeToDriveSyncQueue(() => {
+      try {
+        setQueueLength(getDriveSyncQueueLength())
+      } catch (cause) {
+        setStatus('error')
+        setError(cause instanceof Error ? cause.message : 'Nie można odczytać kolejki synchronizacji.')
+      }
+    })
     return () => {
-      active = false
-      unsubscribe()
+      unsubscribeToken()
+      unsubscribeQueue()
     }
   }, [])
 
@@ -215,8 +214,8 @@ export function DriveSyncCard() {
         <div className="rounded-xl bg-secondary/40 p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">Status:</p>
           <p className="mt-1">
-            Klucz Gemini pozostaje lokalny. Token Drive jest zapisany w pamięci przeglądarki do wygaśnięcia, aby
-            odświeżenie strony nie wymagało ponownego łączenia. Kod strony może odczytać ten token.
+            Wejście na Profil nie uruchamia logowania. Token Drive jest zapisywany w pamięci przeglądarki do
+            wygaśnięcia; po wygaśnięciu kliknij „Połącz” ponownie. Kod strony może odczytać zapisany token.
           </p>
           <p className="mt-2 text-foreground">
             Kolejka zmian: <span className="font-medium">{queueLength}</span>
