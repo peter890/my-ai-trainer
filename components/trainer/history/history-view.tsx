@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { getProfile, getWorkouts } from '@/lib/repositories'
+import { createWorkoutProgressSeries } from '@/lib/workout-progress'
 import { groupWorkoutLogsByDate, createWorkoutLogs } from '@/lib/workout-history'
 import type { WorkoutLog } from '@/lib/trainer-data'
-import { WeightChart } from '../weight-chart'
 import { CalendarCard } from './calendar-card'
+import { StrengthProgressionChart } from './strength-progression-chart'
+import { WeightVolumeChart } from './weight-volume-chart'
 import { WorkoutLogList } from './workout-log-list'
 import { WorkoutDetail } from './workout-detail'
 
@@ -18,7 +20,12 @@ export function HistoryView() {
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedWorkoutId, setSelectedWorkoutId] = useState('')
   const [logState, setLogState] = useState<WorkoutLog[]>([])
-  const [weights, setWeights] = useState<{ date: string; weight: number }[]>([])
+  const [weightVolumePoints, setWeightVolumePoints] = useState(
+    [] as ReturnType<typeof createWorkoutProgressSeries>['weight_volume_points'],
+  )
+  const [strengthProgressPoints, setStrengthProgressPoints] = useState(
+    [] as ReturnType<typeof createWorkoutProgressSeries>['strength_progress_points'],
+  )
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
 
@@ -28,13 +35,11 @@ export function HistoryView() {
 
     try {
       const [profile, workouts] = await Promise.all([getProfile(), getWorkouts()])
-      const nextWeights = (profile?.profile.weight_history ?? []).map((entry) => ({
-        date: entry.date.slice(5).replace('-', '.'),
-        weight: Number(entry.weight_kg.toFixed(1)),
-      }))
+      const progressSeries = createWorkoutProgressSeries(profile?.profile.weight_history ?? [], workouts)
       const nextLogs = createWorkoutLogs(workouts)
 
-      setWeights(nextWeights)
+      setWeightVolumePoints(progressSeries.weight_volume_points)
+      setStrengthProgressPoints(progressSeries.strength_progress_points)
       setLogState(nextLogs)
       const latestWorkout = nextLogs[0]
       setSelectedDate((current) =>
@@ -140,11 +145,35 @@ export function HistoryView() {
           <WorkoutDetail date={effectiveSelectedDate} log={selectedLog} />
           <Card>
             <CardHeader>
-              <CardTitle className="font-semibold">Postęp wagi</CardTitle>
-              <CardDescription>Pomiary tygodniowe (kg)</CardDescription>
+              <CardTitle className="font-semibold">Waga i tonaż</CardTitle>
+              <CardDescription>Połączenie pomiarów masy ciała i objętości treningowej z lokalnej historii.</CardDescription>
             </CardHeader>
             <CardContent>
-              <WeightChart data={weights.length ? weights : [{ date: 'brak', weight: 0 }]} className="h-56 md:h-64" />
+              {weightVolumePoints.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  Brak pomiarów lub zakończonych sesji do wyświetlenia trendu.
+                </p>
+              ) : (
+                <WeightVolumeChart data={weightVolumePoints} />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-semibold">Progresja siłowa</CardTitle>
+              <CardDescription>
+                Metoda: najlepszy szacowany 1RM z każdej sesji według wzoru Epleya, czyli ciężar × (1 + powtórzenia/30).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {strengthProgressPoints.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  Brak serii siłowych do wyliczenia progresji.
+                </p>
+              ) : (
+                <StrengthProgressionChart data={strengthProgressPoints} />
+              )}
             </CardContent>
           </Card>
         </div>

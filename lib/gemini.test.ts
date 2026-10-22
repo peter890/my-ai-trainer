@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { GEMINI_MODEL } from './config'
-import { generateWorkoutAnalysis, testGeminiConnection } from './gemini'
+import { generateWorkoutAnalysis, generateWorkoutPlanWithGemini, testGeminiConnection } from './gemini'
+import type { Exercise } from './trainer-data'
 
 describe('testGeminiConnection', () => {
   it('sends the API key in a request header and validates the response', async () => {
@@ -142,5 +143,137 @@ describe('generateWorkoutAnalysis', () => {
     await expect(generateWorkoutAnalysis(workout, undefined, [], 'api-key', fetcher)).rejects.toThrow(
       'Analiza AI nie może przekraczać 150 słów.',
     )
+  })
+})
+
+describe('generateWorkoutPlanWithGemini', () => {
+  const availableExercises: Exercise[] = [
+    {
+      id: 'bench_press',
+      name: 'Wyciskanie sztangi',
+      muscle: 'Klatka',
+      equipment: 'Sztanga',
+      restType: 'heavy_compound' as const,
+      techniqueNote: '',
+      favorite: true,
+      excluded: false,
+      active: true,
+    },
+    {
+      id: 'lat_pulldown',
+      name: 'Ściąganie drążka',
+      muscle: 'Plecy',
+      equipment: 'Wyciąg',
+      restType: 'moderate_compound' as const,
+      techniqueNote: '',
+      favorite: false,
+      excluded: false,
+      active: true,
+    },
+  ]
+
+  it('parses structured JSON plan and validates day count', async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      days: [
+                        {
+                          name: 'Push',
+                          exercises: [{ exercise_id: 'bench_press', scheme: '4 x 6-8' }],
+                        },
+                        {
+                          name: 'Pull',
+                          exercises: [{ exercise_id: 'lat_pulldown', scheme: '3 x 8-12' }],
+                        },
+                      ],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    await expect(
+      generateWorkoutPlanWithGemini(
+        {
+          goal: 'hypertrophy',
+          level: 'intermediate',
+          days_per_week: 2,
+          session_minutes: 60,
+          exercises: availableExercises,
+          prefer_favorites: true,
+        },
+        'api-key',
+        fetcher,
+      ),
+    ).resolves.toEqual({
+      days: [
+        {
+          name: 'Push',
+          exercises: [{ exercise_id: 'bench_press', scheme: '4 x 6-8' }],
+        },
+        {
+          name: 'Pull',
+          exercises: [{ exercise_id: 'lat_pulldown', scheme: '3 x 8-12' }],
+        },
+      ],
+    })
+  })
+
+  it('rejects exercises not present in the provided local catalog', async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      days: [
+                        {
+                          name: 'Push',
+                          exercises: [{ exercise_id: 'hallucinated_id', scheme: '4 x 6-8' }],
+                        },
+                        {
+                          name: 'Pull',
+                          exercises: [{ exercise_id: 'lat_pulldown', scheme: '3 x 8-12' }],
+                        },
+                      ],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    await expect(
+      generateWorkoutPlanWithGemini(
+        {
+          goal: 'hypertrophy',
+          level: 'intermediate',
+          days_per_week: 2,
+          session_minutes: 60,
+          exercises: availableExercises,
+          prefer_favorites: true,
+        },
+        'api-key',
+        fetcher,
+      ),
+    ).rejects.toThrow('spoza katalogu')
   })
 })

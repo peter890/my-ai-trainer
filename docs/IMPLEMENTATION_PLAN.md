@@ -2,7 +2,7 @@
 
 Plan opiera się na weryfikacji `docs/TEMPLATE_AUDIT.md` względem aktualnego kodu oraz `docs/PRD.md`. Jest to plan do wznawiania pracy: wymagania mają stałe identyfikatory i pola wyboru, a ukończenie etapu wymaga spełnienia kryteriów akceptacji.
 
-**Postęp na 16.10.2026:** Etapy 0–3 zakończone; etap 4 jest w toku. W etapie 8 ukończono synchronizację, kopie zapasowe i testy integracji, natomiast instalacja/offline PWA oraz jej weryfikacja na przeglądarkach pozostają otwarte.
+**Postęp na 22.10.2026:** Etapy 0–7 zakończone. W etapie 8 ukończono synchronizację, kopie zapasowe i testy integracji, natomiast instalacja/offline PWA oraz jej weryfikacja na przeglądarkach pozostają otwarte.
 
 ## Status i reguły kontynuacji
 
@@ -142,9 +142,9 @@ Zależność: etapy 2–6.
 
 - `[x] E7.1` Podłączyć kalendarz, listę i szczegóły do rzeczywistych treningów; obsłużyć wiele treningów jednego dnia i daty z rokiem.
 - `[x] E7.2` Wyliczać streak, tygodniowe statystyki i tonaż z historii, bez wartości wpisanych na sztywno.
-- `[ ] E7.3` Podłączyć wykres wagi i tonażu do pomiarów oraz sesji; dodać wykres progresji siłowej z jasno opisaną metodą obliczeń.
-- `[ ] E7.4` Zastąpić lokalny generator planów prawdziwą generacją Gemini, zapisywać plan, filtrować według profilu/ulubionych/wykluczonych i umożliwić jego start.
-- `[ ] E7.5` Dodać testy agregacji, granic tygodnia/miesiąca/roku, wielu sesji na dzień i obliczeń progresu.
+- `[x] E7.3` Podłączyć wykres wagi i tonażu do pomiarów oraz sesji; dodać wykres progresji siłowej z jasno opisaną metodą obliczeń.
+- `[x] E7.4` Zastąpić lokalny generator planów prawdziwą generacją Gemini, zapisywać plan, filtrować według profilu/ulubionych/wykluczonych i umożliwić jego start.
+- `[x] E7.5` Dodać testy agregacji, granic tygodnia/miesiąca/roku, wielu sesji na dzień i obliczeń progresu.
 
 **Kryterium akceptacji:** wszystkie statystyki i wykresy są reprodukowalne z lokalnych danych; historia działa w trybie offline.
 
@@ -152,9 +152,11 @@ Zależność: etapy 2–6.
 
 Zależność: etapy 1–3; synchronizację uruchomić dopiero po stabilizacji schematów i repozytoriów.
 
-- `[ ] E8.1` Dodać poprawne ikony instalacyjne PNG 192×192 i 512×512, zweryfikować manifest i metadane PWA.
-- `[ ] E8.2` Dodać service worker z cache zasobów aplikacji i strategią offline; nie cache’ować klucza ani wrażliwych odpowiedzi.
+- `[x] E8.1` Dodać poprawne ikony instalacyjne PNG 192×192 i 512×512, zweryfikować manifest i metadane PWA.
+- `[x] E8.2` Dodać service worker z cache zasobów aplikacji i strategią offline; nie cache’ować klucza ani wrażliwych odpowiedzi.
 - `[ ] E8.3` Przetestować instalację, start offline i aktualizację service workera na docelowych przeglądarkach; potwierdzić zachowanie hostingu z D-03.
+
+Weryfikacja lokalna E8.3: production static export przechodzi, `/manifest.webmanifest` zwraca poprawny manifest, service worker rejestruje się i aktywuje, a cache zawiera shell oraz fingerprintowane zasoby `/_next/static`. Pełne zaliczenie pozostaje otwarte do ręcznego testu instalacji, startu offline i aktualizacji w Chrome, Firefox i Safari na docelowym hostingu. Narzędzie automatyzacji przeglądarki nie pozwoliło wiarygodnie zasymulować przeładowania offline, ponieważ tryb `setOffline` blokował żądanie przed obsługą service workera.
 - `[x] E8.4` Zaimplementować Google OAuth i Drive AppData bez własnego backendu. Krótkotrwały access token jest przechowywany w localStorage do wygaśnięcia; po wygaśnięciu wymagane jest ponowne połączenie.
 - `[x] E8.5` Synchronizować wersjonowane dane z kolejką zmian offline, wykrywaniem konfliktów i jawnymi stanami błędu/ponowienia. Synchronizacja jest uruchamiana ręcznie z profilu; błędy nie czyszczą kolejki, a konflikt nie nadpisuje repliki.
 - `[x] E8.6` Dodać eksport/import kopii zapasowej oraz usuwanie danych; walidować każdy import schematem Zod. Import scala dane po ID i zachowuje nowszy rekord według `updated_at` (remisy zachowują dane lokalne); klucz Gemini nie jest eksportowany.

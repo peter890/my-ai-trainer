@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { filterExercisesForPlan } from '@/lib/exercise-catalog'
+import { generateWorkoutPlanWithGemini } from '@/lib/gemini'
 import { createWorkoutPlan } from '@/lib/plan-builder'
-import { savePlans } from '@/lib/repositories'
-import type { Exercise, MuscleGroup } from '@/lib/trainer-data'
+import { getProfile, savePlans } from '@/lib/repositories'
+import type { Exercise } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 import { SavedPlans } from './saved-plans'
 
@@ -17,45 +18,18 @@ const levels = ['Początkujący', 'Średni', 'Zaawansowany'] as const
 const dayOptions = [2, 3, 4, 5, 6]
 const lengthOptions = [45, 60, 75, 90]
 
-const splits: Record<number, { name: string; muscles: MuscleGroup[] }[]> = {
-  2: [
-    { name: 'Full Body A', muscles: ['Klatka', 'Plecy', 'Nogi', 'Brzuch'] },
-    { name: 'Full Body B', muscles: ['Barki', 'Nogi', 'Plecy', 'Ramiona'] },
-  ],
-  3: [
-    { name: 'Push', muscles: ['Klatka', 'Barki', 'Ramiona'] },
-    { name: 'Pull', muscles: ['Plecy', 'Ramiona', 'Brzuch'] },
-    { name: 'Legs', muscles: ['Nogi', 'Brzuch'] },
-  ],
-  4: [
-    { name: 'Upper A', muscles: ['Klatka', 'Plecy', 'Barki'] },
-    { name: 'Lower A', muscles: ['Nogi', 'Brzuch'] },
-    { name: 'Upper B', muscles: ['Plecy', 'Klatka', 'Ramiona'] },
-    { name: 'Lower B', muscles: ['Nogi', 'Brzuch'] },
-  ],
-  5: [
-    { name: 'Push A', muscles: ['Klatka', 'Barki', 'Ramiona'] },
-    { name: 'Pull A', muscles: ['Plecy', 'Ramiona'] },
-    { name: 'Legs', muscles: ['Nogi', 'Brzuch'] },
-    { name: 'Upper', muscles: ['Klatka', 'Plecy', 'Barki'] },
-    { name: 'Lower', muscles: ['Nogi', 'Brzuch'] },
-  ],
-  6: [
-    { name: 'Push A', muscles: ['Klatka', 'Barki', 'Ramiona'] },
-    { name: 'Pull A', muscles: ['Plecy', 'Ramiona'] },
-    { name: 'Legs A', muscles: ['Nogi', 'Brzuch'] },
-    { name: 'Push B', muscles: ['Barki', 'Klatka', 'Ramiona'] },
-    { name: 'Pull B', muscles: ['Plecy', 'Brzuch'] },
-    { name: 'Legs B', muscles: ['Nogi'] },
-  ],
-}
+const goalToGeminiGoal = {
+  Hipertrofia: 'hypertrophy',
+  Siła: 'strength',
+  Redukcja: 'weight_loss',
+  Kondycja: 'endurance',
+} as const
 
-const schemes: Record<(typeof goals)[number], string> = {
-  Hipertrofia: '3–4 × 8–12',
-  Siła: '4–5 × 3–6',
-  Redukcja: '3 × 10–15',
-  Kondycja: '3 × 12–20',
-}
+const levelToGeminiLevel = {
+  Początkujący: 'beginner',
+  Średni: 'intermediate',
+  Zaawansowany: 'advanced',
+} as const
 
 type PlanDay = { name: string; exercises: (Exercise & { scheme: string })[] }
 
@@ -73,33 +47,54 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
   const [error, setError] = useState('')
   const [plansRevision, setPlansRevision] = useState(0)
 
-  const generate = () => {
+  const generate = async () => {
     setLoading(true)
     setPlan(null)
     setError('')
     setMessage('')
-    const perDay = Math.max(3, Math.round(length / 15))
     const pool = filterExercisesForPlan(exercises, skipExcluded)
 
-    setTimeout(() => {
-      setPlan(
-        splits[days].map((day, dayIndex) => {
-          const candidates = pool
-            .filter((e) => day.muscles.includes(e.muscle))
-            .sort((a, b) => {
-              const fav = preferFavorites ? Number(b.favorite) - Number(a.favorite) : 0
-              if (fav !== 0) return fav
-              return day.muscles.indexOf(a.muscle) - day.muscles.indexOf(b.muscle)
-            })
-          const rotated = [...candidates.slice(dayIndex % 2), ...candidates.slice(0, dayIndex % 2)]
-          return {
-            name: day.name,
-            exercises: rotated.slice(0, perDay).map((e) => ({ ...e, scheme: schemes[goal] })),
-          }
-        }),
-      )
+    if (pool.length === 0) {
+      setError('Brak aktywnych ćwiczeń do wygenerowania planu. Zmień filtry lub aktywuj ćwiczenia.')
       setLoading(false)
-    }, 1400)
+      return
+    }
+
+    const profile = await getProfile().catch(() => undefined)
+
+    try {
+      const generated = await generateWorkoutPlanWithGemini({
+        goal: goalToGeminiGoal[goal],
+        level: levelToGeminiLevel[level],
+        days_per_week: days,
+        session_minutes: length,
+        profile,
+        prefer_favorites: preferFavorites,
+        exercises: pool,
+      })
+
+      const byId = new Map(pool.map((exercise) => [exercise.id, exercise] as const))
+      const nextPlan: PlanDay[] = generated.days.map((day) => ({
+        name: day.name,
+        exercises: day.exercises
+          .map((item) => {
+            const exercise = byId.get(item.exercise_id)
+            if (!exercise) return null
+            return { ...exercise, scheme: item.scheme }
+          })
+          .filter((exercise): exercise is Exercise & { scheme: string } => exercise !== null),
+      }))
+
+      if (nextPlan.some((day) => day.exercises.length === 0)) {
+        throw new Error('Gemini zwróciło niekompletny plan. Spróbuj ponownie.')
+      }
+
+      setPlan(nextPlan)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Nie udało się wygenerować planu AI.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const saveGeneratedPlan = async () => {
@@ -183,7 +178,7 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
 
           <button
             type="button"
-            onClick={generate}
+            onClick={() => void generate()}
             disabled={loading}
             className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
           >

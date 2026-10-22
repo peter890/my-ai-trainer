@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ai-trainer-shell-v2'
+const CACHE_NAME = 'ai-trainer-shell-v3'
 const APP_SHELL = [
   '/',
   '/icon.svg',
@@ -46,17 +46,56 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (url.pathname.startsWith('/api/') || url.pathname.includes('googleapis.com')) {
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.includes('googleapis.com') ||
+    url.pathname.includes('generativelanguage.googleapis.com')
+  ) {
     return
   }
 
-  if (url.pathname.startsWith('/_next/')) {
-    return
-  }
-
-  if (request.mode === 'navigate') {
+  if (request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')) {
     event.respondWith(
-      fetch(request)
+      caches.match(request).then(async (cached) => {
+        if (cached) return cached
+
+        const cachedShell = await caches.match('/')
+        if (cachedShell) return cachedShell
+
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const responseClone = response.clone()
+            void caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
+          }
+          return response
+        })
+      }),
+    )
+    return
+  }
+
+  const isNextStaticAsset = url.pathname.startsWith('/_next/static/')
+  if (!CACHEABLE_ASSETS.has(url.pathname) && !isNextStaticAsset) {
+    return
+  }
+
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) {
+        if (isNextStaticAsset) {
+          void fetch(request)
+            .then((response) => {
+              if (response.ok) {
+                return caches.open(CACHE_NAME).then((cache) => cache.put(request, response))
+              }
+              return undefined
+            })
+            .catch(() => undefined)
+        }
+        return cached
+      }
+
+      return fetch(request)
         .then((response) => {
           if (response.ok) {
             const responseClone = response.clone()
@@ -64,28 +103,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response
         })
-        .catch(async () => (await caches.match(request)) ?? (await caches.match('/'))),
-    )
-    return
-  }
-
-  if (!CACHEABLE_ASSETS.has(url.pathname)) {
-    return
-  }
-
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        return cached
-      }
-
-      return fetch(request)
-        .then((response) => {
-          const responseClone = response.clone()
-          void caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
-          return response
-        })
-        .catch(() => caches.match('/') || caches.match('/icon.svg'))
+        .catch(() => caches.match('/'))
     }),
   )
 })

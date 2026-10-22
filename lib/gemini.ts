@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { GEMINI_MODEL } from './config'
 import { GeminiApiKeySchema, getGeminiApiKey } from './local-secrets'
-import { AiAnalysisFeedbackSchema } from './schemas'
+import { AiAnalysisFeedbackSchema, GeneratedWorkoutPlanSchema } from './schemas'
 import type { ProfileDocument, Workout } from './schemas'
+import type { Exercise as ExerciseView } from './trainer-data'
 
 const GeminiTextResponseSchema = z.object({
   candidates: z
@@ -18,6 +19,9 @@ const GeminiTextResponseSchema = z.object({
 const GeminiAnalysisSchema = z.object({
   feedback_text: AiAnalysisFeedbackSchema,
 })
+
+const PlanGenerationGoalSchema = z.enum(['hypertrophy', 'strength', 'weight_loss', 'endurance'])
+const PlanGenerationLevelSchema = z.enum(['beginner', 'intermediate', 'advanced'])
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
@@ -71,6 +75,26 @@ function extractTextFromResponse(payload: unknown): string {
   )
 
   return textParts.join('\n').trim()
+}
+
+function extractJsonBlock(text: string): string {
+  const trimmed = text.trim()
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed
+
+  const match = trimmed.match(/\{[\s\S]*\}/)
+  if (!match) {
+    throw new Error('Gemini zwróciło odpowiedź, której nie udało się odczytać jako JSON planu.')
+  }
+
+  return match[0]
+}
+
+function parseJson<T>(text: string): T {
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error('Gemini zwróciło niepoprawny JSON planu treningowego.')
+  }
 }
 
 export async function testGeminiConnection(apiKey: unknown, fetcher: Fetcher = fetch): Promise<void> {
@@ -156,4 +180,132 @@ ZADANIE
   }
 
   return GeminiAnalysisSchema.parse({ feedback_text: text })
+}
+
+export async function generateWorkoutPlanWithGemini(
+  input: {
+    goal: z.infer<typeof PlanGenerationGoalSchema>
+    level: z.infer<typeof PlanGenerationLevelSchema>
+    days_per_week: number
+    session_minutes: number
+    exercises: ExerciseView[]
+    profile?: ProfileDocument
+    prefer_favorites: boolean
+  },
+  apiKey?: string,
+  fetcher: Fetcher = fetch,
+): Promise<z.infer<typeof GeneratedWorkoutPlanSchema>> {
+  const validApiKey = GeminiApiKeySchema.parse(apiKey ?? getGeminiApiKey())
+  const goal = PlanGenerationGoalSchema.parse(input.goal)
+  const level = PlanGenerationLevelSchema.parse(input.level)
+  const daysPerWeek = z.number().int().min(2).max(6).parse(input.days_per_week)
+  const sessionMinutes = z.number().int().min(30).max(120).parse(input.session_minutes)
+  const exercises = z
+    .array(
+      z
+        .object({
+          id: z.string().trim().min(1).max(100),
+          name: z.string().trim().min(1).max(120),
+          muscle: z.enum(['Klatka', 'Plecy', 'Barki', 'Nogi', 'Ramiona', 'Brzuch']),
+          equipment: z.string().trim().min(1).max(40),
+          restType: z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'cardio']),
+          techniqueNote: z.string().max(2000),
+          favorite: z.boolean(),
+          excluded: z.boolean(),
+          active: z.boolean(),
+          custom: z.boolean().optional(),
+        })
+        .strict(),
+    )
+    .min(1)
+    .parse(input.exercises)
+
+  const prompt = `Jesteś trenerem personalnym i tworzysz tygodniowy plan treningowy.
+Zwróć WYŁĄCZNIE poprawny JSON, bez markdown i bez dodatkowych komentarzy.
+
+Format odpowiedzi JSON:
+{
+  "days": [
+    {
+      "name": "Push A",
+      "exercises": [
+        { "exercise_id": "bench_press", "scheme": "4 x 6-8" }
+      ]
+    }
+  ]
+}
+
+Wymagania:
+- liczba dni planu musi być równa days_per_week,
+- wybieraj tylko exercise_id z listy available_exercises,
+- każde ćwiczenie w danym dniu może wystąpić tylko raz,
+- zakres scheme dopasuj do celu i poziomu,
+- uwzględnij profil użytkownika, jeśli podano,
+- jeśli prefer_favorites = true, preferuj ćwiczenia oznaczone jako favorite.
+
+KONTEKST JSON
+${JSON.stringify(
+    {
+      goal,
+      level,
+      days_per_week: daysPerWeek,
+      session_minutes: sessionMinutes,
+      prefer_favorites: input.prefer_favorites,
+      profile: input.profile
+        ? {
+            gender: input.profile.profile.gender,
+            age: input.profile.profile.age,
+            experience_level: input.profile.profile.experience_level,
+            primary_goal: input.profile.profile.primary_goal,
+            excluded_exercise_ids: input.profile.exercise_preferences.excluded_exercise_ids,
+          }
+        : null,
+      available_exercises: exercises.map((exercise) => ({
+        id: exercise.id,
+        name: exercise.name,
+        muscle: exercise.muscle,
+        equipment: exercise.equipment,
+        rest_type: exercise.restType,
+        favorite: exercise.favorite,
+      })),
+    },
+    null,
+    2,
+  )}`
+
+  const response = await requestGemini(fetcher, validApiKey, {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      maxOutputTokens: 1024,
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+    },
+  })
+
+  const text = extractTextFromResponse(await response.json())
+  if (!text) {
+    throw new Error('Gemini nie zwróciło treści planu treningowego.')
+  }
+
+  const parsed = GeneratedWorkoutPlanSchema.parse(parseJson(extractJsonBlock(text)))
+
+  if (parsed.days.length !== daysPerWeek) {
+    throw new Error('Gemini zwróciło plan z nieprawidłową liczbą dni treningowych.')
+  }
+
+  const allowedExerciseIds = new Set(exercises.map((exercise) => exercise.id))
+  for (const day of parsed.days) {
+    const dayIds = day.exercises.map((exercise) => exercise.exercise_id)
+    if (new Set(dayIds).size !== dayIds.length) {
+      throw new Error(`Gemini zwróciło zduplikowane ćwiczenie w dniu "${day.name}".`)
+    }
+
+    for (const exercise of day.exercises) {
+      if (!allowedExerciseIds.has(exercise.exercise_id)) {
+        throw new Error(`Gemini zwróciło ćwiczenie spoza katalogu: ${exercise.exercise_id}.`)
+      }
+    }
+  }
+
+  return parsed
 }

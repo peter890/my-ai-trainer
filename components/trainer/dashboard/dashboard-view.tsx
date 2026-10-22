@@ -25,11 +25,13 @@ export function DashboardView({ liveActive, onStartWorkout, hasUnfinalized, onFi
 
   useEffect(() => {
     let active = true
-    setStatsError('')
 
     void getWorkouts()
       .then((workouts) => {
-        if (active) setStats(calculateWorkoutDashboardStats(workouts))
+        if (active) {
+          setStatsError('')
+          setStats(calculateWorkoutDashboardStats(workouts))
+        }
       })
       .catch((cause: unknown) => {
         if (active) {

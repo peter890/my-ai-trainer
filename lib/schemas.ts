@@ -67,6 +67,50 @@ export const WorkoutDashboardStatsSchema = z
   })
   .strict()
 
+export const WeightVolumePointSchema = z
+  .object({
+    date: z.iso.date(),
+    label: z.string().min(1).max(10),
+    weight_kg: z.number().positive().max(1000).nullable(),
+    volume_kg: z.number().nonnegative().nullable(),
+  })
+  .strict()
+
+export const StrengthProgressPointSchema = z
+  .object({
+    date: z.iso.date(),
+    label: z.string().min(1).max(10),
+    estimated_1rm_kg: z.number().positive().max(2000),
+  })
+  .strict()
+
+export const WorkoutProgressSeriesSchema = z
+  .object({
+    weight_volume_points: z.array(WeightVolumePointSchema),
+    strength_progress_points: z.array(StrengthProgressPointSchema),
+  })
+  .strict()
+
+export const GeneratedWorkoutPlanExerciseSchema = z
+  .object({
+    exercise_id: EntityIdSchema,
+    scheme: z.string().trim().min(3).max(30),
+  })
+  .strict()
+
+export const GeneratedWorkoutPlanDaySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    exercises: z.array(GeneratedWorkoutPlanExerciseSchema).min(1).max(12),
+  })
+  .strict()
+
+export const GeneratedWorkoutPlanSchema = z
+  .object({
+    days: z.array(GeneratedWorkoutPlanDaySchema).min(1).max(7),
+  })
+  .strict()
+
 const IsoDateSchema = z.iso.date()
 const IsoDateTimeSchema = z.iso.datetime()
 
@@ -322,6 +366,12 @@ export type WorkoutStatus = z.infer<typeof WorkoutStatusSchema>
 export type WorkoutLog = z.infer<typeof WorkoutLogSchema>
 export type WeeklyWorkoutStats = z.infer<typeof WeeklyWorkoutStatsSchema>
 export type WorkoutDashboardStats = z.infer<typeof WorkoutDashboardStatsSchema>
+export type WeightVolumePoint = z.infer<typeof WeightVolumePointSchema>
+export type StrengthProgressPoint = z.infer<typeof StrengthProgressPointSchema>
+export type WorkoutProgressSeries = z.infer<typeof WorkoutProgressSeriesSchema>
+export type GeneratedWorkoutPlanExercise = z.infer<typeof GeneratedWorkoutPlanExerciseSchema>
+export type GeneratedWorkoutPlanDay = z.infer<typeof GeneratedWorkoutPlanDaySchema>
+export type GeneratedWorkoutPlan = z.infer<typeof GeneratedWorkoutPlanSchema>
 export type WeightEntry = z.infer<typeof WeightEntrySchema>
 export type Exercise = z.infer<typeof ExerciseSchema>
 export type ExerciseInput = z.input<typeof ExerciseSchema>
