@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { getWorkouts } from '@/lib/repositories'
+import type { WorkoutMode } from '@/lib/schemas'
 import type { TabId } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 import { BottomNav, Logo, Sidebar } from './navigation'
@@ -19,6 +20,7 @@ export function AppShell() {
   const [liveVisible, setLiveVisible] = useState(false)
   const [hasUnfinalized, setHasUnfinalized] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState('')
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('planned')
 
   useEffect(() => {
     let active = true
@@ -30,6 +32,8 @@ export function AppShell() {
         if (ongoing) {
           setLiveActive(true)
           setLiveVisible(true)
+          setSelectedPlanId(ongoing.plan_id ?? '')
+          setWorkoutMode(ongoing.workout_mode ?? 'planned')
         }
         setHasUnfinalized(workouts.some((workout) => workout.status === 'pending_finalization'))
       })
@@ -52,6 +56,15 @@ export function AppShell() {
 
   const startWorkout = (planId: string) => {
     setSelectedPlanId(planId)
+    setWorkoutMode('planned')
+    setLiveActive(true)
+    setLiveVisible(true)
+    window.scrollTo({ top: 0 })
+  }
+
+  const startFreeWorkout = () => {
+    setSelectedPlanId('')
+    setWorkoutMode('free')
     setLiveActive(true)
     setLiveVisible(true)
     window.scrollTo({ top: 0 })
@@ -98,6 +111,7 @@ export function AppShell() {
             <div className={cn(!liveVisible && 'hidden')}>
               <LiveWorkout
                 planId={selectedPlanId}
+                mode={workoutMode}
                 onMinimize={() => setLiveVisible(false)}
                 onAbort={abortWorkoutStart}
                 onFinish={finishWorkout}
@@ -111,6 +125,7 @@ export function AppShell() {
                 <DashboardView
                   liveActive={liveActive}
                   onStartWorkout={startWorkout}
+                  onStartFreeWorkout={startFreeWorkout}
                   hasUnfinalized={hasUnfinalized}
                   onFinalized={() => setHasUnfinalized(false)}
                   onNavigate={selectTab}

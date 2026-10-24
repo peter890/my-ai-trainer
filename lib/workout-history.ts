@@ -1,8 +1,9 @@
 import { WorkoutLogSchema, type Workout, type WorkoutLog, type WorkoutType } from './schemas'
 import { formatPace, getCardioSummary } from './cardio'
 
-function inferWorkoutType(planName: string): WorkoutType {
-  const value = planName.toLowerCase()
+function inferWorkoutType(workout: Workout): WorkoutType {
+  if (workout.exercises.some((exercise) => exercise.cardio)) return 'cardio'
+  const value = workout.plan_name.toLowerCase()
 
   if (value.includes('pull')) return 'pull'
   if (value.includes('leg') || value.includes('nogi')) return 'legs'
@@ -86,7 +87,7 @@ export function toWorkoutLog(workout: Workout): WorkoutLog {
       hourCycle: 'h23',
     }).format(startedAt),
     title: workout.plan_name || 'Trening',
-    type: inferWorkoutType(workout.plan_name || 'Push'),
+    type: inferWorkoutType(workout),
     duration,
     volume: Math.round(volume),
     cardio,

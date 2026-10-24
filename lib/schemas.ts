@@ -16,6 +16,7 @@ export const EquipmentSchema = z.enum([
 export const RestTypeSchema = z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'cardio'])
 export const RestTimerSignalSchema = z.enum(['none', 'vibrate']).default('vibrate')
 export const WorkoutTypeSchema = z.enum(['push', 'pull', 'legs', 'cardio'])
+export const WorkoutModeSchema = z.enum(['planned', 'free'])
 export const WorkoutStatusSchema = z.enum(['in_progress', 'pending_finalization', 'completed'])
 export const EntityIdSchema = z.string().trim().min(1).max(100)
 export const WorkoutLogSchema = z
@@ -321,6 +322,7 @@ export const WorkoutSchema = z
     start_time: IsoDateTimeSchema,
     end_time: IsoDateTimeSchema.optional(),
     status: WorkoutStatusSchema,
+    workout_mode: WorkoutModeSchema.optional(),
     plan_id: z.string().min(1).max(100).optional(),
     plan_name: z.string().trim().min(1).max(120),
     paused_at: IsoDateTimeSchema.optional(),
@@ -368,8 +370,9 @@ export const WorkoutSchema = z
 export const LiveSessionSnapshotSchema = z
   .object({
     workout_id: EntityIdSchema,
-    plan_id: EntityIdSchema,
-    exercise_ids: z.array(EntityIdSchema).min(1).max(100),
+    workout_mode: WorkoutModeSchema.optional(),
+    plan_id: EntityIdSchema.optional(),
+    exercise_ids: z.array(EntityIdSchema).max(100),
     exercise_index: z.number().int().nonnegative().max(99),
     draft: z
       .object({
@@ -386,7 +389,7 @@ export const LiveSessionSnapshotSchema = z
   })
   .strict()
   .superRefine((snapshot, context) => {
-    if (snapshot.exercise_index >= snapshot.exercise_ids.length) {
+    if (snapshot.exercise_ids.length > 0 && snapshot.exercise_index >= snapshot.exercise_ids.length) {
       context.addIssue({
         code: 'custom',
         message: 'Bieżące ćwiczenie nie istnieje w zapisanej sesji.',
@@ -402,6 +405,7 @@ export type MuscleGroup = z.infer<typeof MuscleGroupSchema>
 export type Equipment = z.infer<typeof EquipmentSchema>
 export type RestType = z.infer<typeof RestTypeSchema>
 export type WorkoutType = z.infer<typeof WorkoutTypeSchema>
+export type WorkoutMode = z.infer<typeof WorkoutModeSchema>
 export type WorkoutStatus = z.infer<typeof WorkoutStatusSchema>
 export type WorkoutLog = z.infer<typeof WorkoutLogSchema>
 export type WeeklyWorkoutStats = z.infer<typeof WeeklyWorkoutStatsSchema>

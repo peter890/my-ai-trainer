@@ -242,3 +242,34 @@ export function buildSessionExercises(
     }
   })
 }
+
+export function buildFreeSessionExercise(
+  exerciseId: string,
+  exercises: Exercise[],
+  workouts: Workout[],
+  restTimerDefaults?: RestTimerDefaults,
+  preferences?: ExercisePreferences,
+): SessionExercise {
+  const exercise = exercises.find((candidate) => candidate.id === exerciseId)
+  if (!exercise) throw new Error(`Ćwiczenie o ID „${exerciseId}” nie istnieje w katalogu.`)
+
+  const timestamp = new Date(0).toISOString()
+  const freePlan: WorkoutPlan = {
+    id: 'free-session',
+    name: 'Trening swobodny',
+    type: 'push',
+    exercises: [
+      {
+        exercise_id: exercise.id,
+        order: 0,
+        target_sets: 1,
+        target_reps: 'Bez celu',
+        rest_type: exercise.rest_type,
+      },
+    ],
+    created_at: timestamp,
+    updated_at: timestamp,
+  }
+
+  return buildSessionExercises(freePlan, exercises, workouts, restTimerDefaults, preferences)[0]!
+}

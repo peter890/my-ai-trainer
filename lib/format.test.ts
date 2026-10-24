@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDuration, formatHistoryDate, formatPolishCount } from './format'
+import { formatCurrentDate, formatDuration, formatHistoryDate, formatPolishCount } from './format'
 
 describe('formatDuration', () => {
   it('formats durations with and without hours', () => {
@@ -27,5 +27,11 @@ describe('formatHistoryDate', () => {
       expect(formatPolishCount(14, 'trening', 'treningi', 'treningów')).toBe('14 treningów')
       expect(formatPolishCount(22, 'trening', 'treningi', 'treningów')).toBe('22 treningi')
     })
+  })
+})
+
+describe('formatCurrentDate', () => {
+  it('formats the current dashboard date in Polish', () => {
+    expect(formatCurrentDate(new Date('2026-10-24T12:00:00.000Z'))).toBe('sobota, 24 października 2026')
   })
 })

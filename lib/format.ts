@@ -45,3 +45,12 @@ export function formatHistoryDate(date: string): string | null {
     timeZone: 'UTC',
   }).format(parsed)
 }
+
+export function formatCurrentDate(date = new Date()): string {
+  return new Intl.DateTimeFormat('pl-PL', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+}

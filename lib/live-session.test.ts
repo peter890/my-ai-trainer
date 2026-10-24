@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildSessionExercises,
+  buildFreeSessionExercise,
   getSessionElapsedMs,
   getSessionRestRemainingMs,
   getWorkoutPlanCatalogError,
@@ -113,6 +114,15 @@ describe('live session plan resolution', () => {
         note: 'Kontroluj opuszczanie.',
       },
     ])
+  })
+
+  it('builds a free-session exercise without a planned rep target', () => {
+    expect(buildFreeSessionExercise(benchPress.id, [benchPress], [])).toMatchObject({
+      exercise_id: benchPress.id,
+      targetSets: 1,
+      targetReps: 'Bez celu',
+      completedSets: [],
+    })
   })
 
   it('uses profile rest defaults for the exercise rest type', () => {

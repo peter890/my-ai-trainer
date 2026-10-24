@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Clock, Dumbbell, Play, Sparkles } from 'lucide-react'
+import { Clock, Dumbbell, ListPlus, Play, Sparkles } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getExercises, getPlans } from '@/lib/repositories'
@@ -13,10 +13,12 @@ import { cn } from '@/lib/utils'
 export function QuickStartCard({
   liveActive,
   onStart,
+  onStartFree,
   className,
 }: {
   liveActive: boolean
   onStart: (planId: string) => void
+  onStartFree: () => void
   className?: string
 }) {
   const [plans, setPlans] = useState<WorkoutPlan[]>([])
@@ -139,27 +141,39 @@ export function QuickStartCard({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (selectedPlan) onStart(selectedPlan.id)
-          }}
-          disabled={status !== 'ready' || !selectedPlan || Boolean(planError)}
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none md:w-auto"
-        >
-          <Play className="size-5 fill-current" aria-hidden="true" />
-          {status === 'loading'
-            ? 'Wczytywanie…'
-            : liveActive
-              ? 'Wróć do treningu'
-              : status === 'empty'
-                ? 'Brak planu'
-                : status === 'error'
-                  ? 'Nie można wczytać planów'
-                  : planError
-                    ? 'Plan wymaga poprawy'
-                  : 'Rozpocznij trening'}
-        </button>
+        <div className="flex w-full flex-col gap-2 md:w-auto">
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedPlan) onStart(selectedPlan.id)
+            }}
+            disabled={status !== 'ready' || !selectedPlan || Boolean(planError)}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground disabled:shadow-none"
+          >
+            <Play className="size-5 fill-current" aria-hidden="true" />
+            {status === 'loading'
+              ? 'Wczytywanie…'
+              : liveActive
+                ? 'Wróć do treningu'
+                : status === 'empty'
+                  ? 'Brak planu'
+                  : status === 'error'
+                    ? 'Nie można wczytać planów'
+                    : planError
+                      ? 'Plan wymaga poprawy'
+                    : 'Rozpocznij trening'}
+          </button>
+          {!liveActive ? (
+            <button
+              type="button"
+              onClick={onStartFree}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+            >
+              <ListPlus className="size-4" aria-hidden="true" />
+              Trening swobodny
+            </button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   )

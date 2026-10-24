@@ -16,6 +16,7 @@ import {
 } from '@/lib/repositories'
 import {
   buildSessionExercises,
+  buildFreeSessionExercise,
   getSessionElapsedMs,
   getSessionRestRemainingMs,
   prepareInterruptedWorkoutForFinalization,
@@ -25,7 +26,7 @@ import {
   type SessionExercise,
 } from '@/lib/live-session'
 import type { LoggedSet } from '@/lib/trainer-data'
-import type { CardioMetrics, Workout } from '@/lib/schemas'
+import type { CardioMetrics, Exercise, ExercisePreferences, ProfileDocument, Workout, WorkoutMode } from '@/lib/schemas'
 import { getCardioSummary } from '@/lib/cardio'
 import { getExpiredRestSignalEnd, sendRestCompletionSignal } from '@/lib/rest-signal'
 import { LiveWorkoutHeader } from './live-workout-header'
@@ -34,10 +35,12 @@ import { SetsTable } from './sets-table'
 import { RestTimer } from './rest-timer'
 import { ExerciseQueue } from './exercise-queue'
 import { CardioMetricsForm } from './cardio-metrics-form'
+import { FreeExercisePicker } from './free-exercise-picker'
 import { useScreenWakeLock } from './use-screen-wake-lock'
 
 type LiveWorkoutProps = {
   planId: string
+  mode: WorkoutMode
   onMinimize: () => void
   onAbort: () => void
   onFinish: () => void
@@ -46,6 +49,7 @@ type LiveWorkoutProps = {
 type SessionState = SessionClockState & {
   workoutId: string
   startedAt: number
+  mode: WorkoutMode
   planId: string
   planName: string
   exercises: SessionExercise[]
@@ -58,7 +62,7 @@ const emptySet = (exercise?: SessionExercise): SetDraft => ({
   rir: 2,
 })
 
-export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorkoutProps) {
+export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: LiveWorkoutProps) {
   const [session, setSession] = useState<SessionState | null>(null)
   const [clockNow, setClockNow] = useState(() => Date.now())
   const [index, setIndex] = useState(0)
@@ -79,6 +83,10 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
   const [restSignal, setRestSignal] = useState<'none' | 'vibrate'>('vibrate')
   const [restSignalNotice, setRestSignalNotice] = useState('')
   const [bodyWeightKg, setBodyWeightKg] = useState<number | undefined>()
+  const [availableExercises, setAvailableExercises] = useState<Exercise[]>([])
+  const [workoutHistory, setWorkoutHistory] = useState<Workout[]>([])
+  const [restTimerDefaults, setRestTimerDefaults] = useState<ProfileDocument['settings']['rest_timer_defaults']>()
+  const [exercisePreferences, setExercisePreferences] = useState<ExercisePreferences>()
   const lastSignaledRestEnd = useRef<number | null>(null)
 
   useEffect(() => {
@@ -95,20 +103,24 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
       .then(([plans, exercises, workouts, profile, preferences, snapshot]) => {
         if (!active) return
         const currentWorkout = workouts.find((workout) => workout.status === 'in_progress')
+        const currentMode = currentWorkout?.workout_mode ?? mode
+        const plannedWorkout = currentMode === 'planned'
+          ? currentWorkout
+            ? currentWorkout.plan_id
+              ? plans.find((candidate) => candidate.id === currentWorkout.plan_id)
+              : plans.filter((candidate) => candidate.name === currentWorkout.plan_name).length === 1
+                ? plans.find((candidate) => candidate.name === currentWorkout.plan_name)
+                : undefined
+            : plans.find((candidate) => candidate.id === planId)
+          : undefined
         setRecoveryWorkout(currentWorkout ?? null)
+        setAvailableExercises(exercises)
+        setWorkoutHistory(workouts)
+        setRestTimerDefaults(profile?.settings.rest_timer_defaults)
+        setExercisePreferences(preferences)
         setRestSignal(profile?.settings.rest_timer_signal ?? 'vibrate')
         setBodyWeightKg(profile?.profile.weight_history.at(-1)?.weight_kg)
-        const legacyPlanMatches = currentWorkout?.plan_id
-          ? []
-          : plans.filter((candidate) => candidate.name === currentWorkout?.plan_name)
-        const plan = currentWorkout
-          ? currentWorkout.plan_id
-            ? plans.find((candidate) => candidate.id === currentWorkout.plan_id)
-            : legacyPlanMatches.length === 1
-              ? legacyPlanMatches[0]
-              : undefined
-          : plans.find((candidate) => candidate.id === planId)
-        if (!plan) {
+        if (currentMode === 'planned' && !plannedWorkout) {
           setLoadError(
             currentWorkout
               ? 'Nie znaleziono jednoznacznego planu przypisanego do wznowionej sesji. Zakończ lub usuń tę sesję przed rozpoczęciem kolejnej.'
@@ -121,39 +133,50 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
         const matchingSnapshot =
           currentWorkout &&
           snapshot?.workout_id === currentWorkout.id &&
-          snapshot.plan_id === plan.id
+          snapshot.workout_mode === currentMode &&
+          (currentMode === 'free' || snapshot.plan_id === plannedWorkout?.id)
             ? snapshot
             : undefined
+        const expectedExerciseIds = currentMode === 'free'
+          ? currentWorkout?.exercises.map((exercise) => exercise.exercise_id) ?? []
+          : plannedWorkout?.exercises.map((exercise) => exercise.exercise_id) ?? []
         if (
           matchingSnapshot &&
-          (matchingSnapshot.exercise_ids.length !== plan.exercises.length ||
+          (matchingSnapshot.exercise_ids.length !== expectedExerciseIds.length ||
             matchingSnapshot.exercise_ids.some((id) => !exercises.some((exercise) => exercise.id === id)))
         ) {
           setLoadError('Zapisany stan sesji zawiera ćwiczenie, którego nie ma już w katalogu. Zakończ sesję, aby zachować zapisane serie.')
           setIsLoading(false)
           return
         }
-        const sessionPlan = matchingSnapshot
-          ? {
-              ...plan,
-              exercises: plan.exercises.map((planExercise, exerciseIndex) => ({
-                ...planExercise,
-                exercise_id: matchingSnapshot.exercise_ids[exerciseIndex] ?? planExercise.exercise_id,
-              })),
-            }
-          : plan
-
         setLoadError('')
-        const sessionExercises = buildSessionExercises(
-          sessionPlan,
-          exercises,
-          workouts,
-          profile?.settings.rest_timer_defaults,
-          preferences,
-        )
+        const sessionExerciseIds = matchingSnapshot?.exercise_ids ?? expectedExerciseIds
+        const sessionExercises = currentMode === 'free'
+          ? sessionExerciseIds.map((exerciseId) =>
+              buildFreeSessionExercise(
+                exerciseId,
+                exercises,
+                workouts,
+                profile?.settings.rest_timer_defaults,
+                preferences,
+              ),
+            )
+          : buildSessionExercises(
+              {
+                ...plannedWorkout!,
+                exercises: plannedWorkout!.exercises.map((planExercise, exerciseIndex) => ({
+                  ...planExercise,
+                  exercise_id: matchingSnapshot?.exercise_ids[exerciseIndex] ?? planExercise.exercise_id,
+                })),
+              },
+              exercises,
+              workouts,
+              profile?.settings.rest_timer_defaults,
+              preferences,
+            )
         const now = Date.now()
         const restoredIndex = matchingSnapshot
-          ? Math.min(matchingSnapshot.exercise_index, sessionExercises.length - 1)
+          ? Math.max(0, Math.min(matchingSnapshot.exercise_index, Math.max(0, sessionExercises.length - 1)))
           : 0
         const snapshotAgeMs = matchingSnapshot ? Math.max(0, now - Date.parse(matchingSnapshot.updated_at)) : 0
         const paused = matchingSnapshot?.paused ?? Boolean(currentWorkout?.paused_at)
@@ -174,8 +197,9 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
         const nextSession: SessionState = {
           workoutId: currentWorkout?.id ?? `live-session-${now}`,
           startedAt: currentWorkout?.start_time ? Date.parse(currentWorkout.start_time) : now,
-          planId: plan.id,
-          planName: plan.name,
+          mode: currentMode,
+          planId: currentWorkout?.plan_id ?? plannedWorkout?.id ?? '',
+          planName: currentWorkout?.plan_name ?? plannedWorkout?.name ?? 'Trening swobodny',
           exercises: sessionExercises,
           elapsedMs,
           paused,
@@ -199,7 +223,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
     return () => {
       active = false
     }
-  }, [planId])
+  }, [mode, planId])
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 250)
@@ -218,8 +242,9 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
         id: session.workoutId,
         start_time: new Date(session.startedAt).toISOString(),
         status: 'in_progress',
+        workout_mode: session.mode,
         plan_name: session.planName,
-        plan_id: session.planId,
+        plan_id: session.planId || undefined,
         exercises: session.exercises.map((exercise) => ({
           exercise_id: exercise.exercise_id,
           exercise_name: exercise.name,
@@ -237,7 +262,8 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
       })
       await saveLiveSessionSnapshot({
         workout_id: session.workoutId,
-        plan_id: session.planId,
+        workout_mode: session.mode,
+        plan_id: session.planId || undefined,
         exercise_ids: session.exercises.map((exercise) => exercise.exercise_id),
         exercise_index: index,
         draft,
@@ -283,12 +309,53 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
 
   const exercise = session?.exercises[index] ?? null
   const sets = exercise?.completedSets ?? []
-  const isLast = !!session && index === session.exercises.length - 1
+  const isLast = !!session && session.exercises.length > 0 && index === session.exercises.length - 1
   const totalTarget = session?.exercises.reduce((sum, item) => sum + item.targetSets, 0) ?? 0
   const completedCount = (item: SessionExercise) => item.isCardio
     ? item.completedCardio ? 1 : 0
     : item.completedSets.length
   const totalDone = session?.exercises.reduce((sum, item) => sum + completedCount(item), 0) ?? 0
+
+  const addFreeExercise = (record: Exercise) => {
+    if (!session || session.mode !== 'free' || session.exercises.some((item) => item.exercise_id === record.id)) return
+    try {
+      const newExercise = buildFreeSessionExercise(
+        record.id,
+        availableExercises,
+        workoutHistory,
+        restTimerDefaults,
+        exercisePreferences,
+      )
+      setSession((current) =>
+        current
+          ? { ...current, exercises: [...current.exercises, newExercise] }
+          : current,
+      )
+      if (session.exercises.length === 0) {
+        setIndex(0)
+        setDraft(emptySet(newExercise))
+      }
+      setFinishError('')
+    } catch (cause) {
+      setPersistenceError(cause instanceof Error ? cause.message : 'Nie udało się dodać ćwiczenia.')
+    }
+  }
+
+  const removeFreeExercise = (exerciseId: string) => {
+    if (!session || session.mode !== 'free') return
+    const removedIndex = session.exercises.findIndex((item) => item.exercise_id === exerciseId)
+    if (removedIndex < 0) return
+    const nextExercises = session.exercises.filter((item) => item.exercise_id !== exerciseId)
+    setSession((current) => current ? { ...current, exercises: nextExercises } : current)
+    if (nextExercises.length === 0) {
+      setIndex(0)
+      setDraft(emptySet())
+    } else if (removedIndex < index) {
+      setIndex((current) => current - 1)
+    } else if (index >= nextExercises.length) {
+      setIndex(nextExercises.length - 1)
+    }
+  }
 
   const togglePause = () => {
     const now = Date.now()
@@ -457,6 +524,10 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
 
   const finishWorkout = async () => {
     if (!session || isFinalizingRef.current) return
+    if (session.exercises.length === 0) {
+      setFinishError('Dodaj co najmniej jedno ćwiczenie przed zakończeniem treningu.')
+      return
+    }
     isFinalizingRef.current = true
     setIsFinishing(true)
     setFinishError('')
@@ -469,8 +540,9 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
         start_time: new Date(session.startedAt).toISOString(),
         end_time: new Date(now).toISOString(),
         status: 'pending_finalization' as const,
+        workout_mode: session.mode,
         plan_name: session.planName,
-        plan_id: session.planId,
+        plan_id: session.planId || undefined,
         paused_duration_ms: getSessionElapsedMs(session, now),
         exercises: session.exercises.map((item) => ({
           exercise_id: item.exercise_id,
@@ -539,7 +611,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
     />
   ) : null
 
-  if (isLoading || !session || !exercise) {
+  if (isLoading || !session) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-4 py-12 text-center">
         {loadError ? (
@@ -570,7 +642,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
         title={session.planName}
         elapsed={Math.max(0, Math.floor(getSessionElapsedMs(session, clockNow) / 1000))}
         paused={session.paused}
-        position={`Ćwiczenie ${index + 1} z ${session.exercises.length}`}
+        position={exercise ? `Ćwiczenie ${index + 1} z ${session.exercises.length}` : 'Wybierz ćwiczenie'}
         progress={Math.min(100, (totalDone / totalTarget) * 100 || 0)}
         onTogglePause={togglePause}
         onFinish={() => setIsFinishDialogOpen(true)}
@@ -596,7 +668,17 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
               {restSignalNotice}
             </p>
           ) : null}
-          <ExerciseCard
+          {session.mode === 'free' ? (
+            <FreeExercisePicker
+              exercises={availableExercises}
+              selectedIds={session.exercises.map((item) => item.exercise_id)}
+              onSelect={addFreeExercise}
+              onRemove={removeFreeExercise}
+            />
+          ) : null}
+          {exercise ? (
+            <>
+              <ExerciseCard
             key={`${exercise.exercise_id}-${index}`}
             name={exercise.name}
             note={exercise.note}
@@ -647,30 +729,36 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
               })
               setDraftError('')
             }}
-          />
-          <div className="lg:hidden">{restTimer}</div>
-          {exercise.isCardio ? (
-            <CardioMetricsForm
-              key={`${exercise.exercise_id}-${index}`}
-              value={exercise.completedCardio}
-              bodyWeightKg={bodyWeightKg}
-              onSave={saveCardio}
-            />
+              />
+              <div className="lg:hidden">{restTimer}</div>
+              {exercise.isCardio ? (
+                <CardioMetricsForm
+                  key={`${exercise.exercise_id}-${index}`}
+                  value={exercise.completedCardio}
+                  bodyWeightKg={bodyWeightKg}
+                  onSave={saveCardio}
+                />
+              ) : (
+                <SetsTable
+                  sets={sets}
+                  targetSets={exercise.targetSets}
+                  targetReps={exercise.targetReps}
+                  draft={draft}
+                  onDraftChange={(nextDraft) => {
+                    setDraft(nextDraft)
+                    setDraftError('')
+                  }}
+                  draftError={draftError}
+                  onLogSet={logSet}
+                  onEditSet={editSet}
+                  onDeleteSet={deleteSet}
+                />
+              )}
+            </>
           ) : (
-            <SetsTable
-              sets={sets}
-              targetSets={exercise.targetSets}
-              targetReps={exercise.targetReps}
-              draft={draft}
-              onDraftChange={(nextDraft) => {
-                setDraft(nextDraft)
-                setDraftError('')
-              }}
-              draftError={draftError}
-              onLogSet={logSet}
-              onEditSet={editSet}
-              onDeleteSet={deleteSet}
-            />
+            <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              Wybierz pierwsze ćwiczenie, aby rozpocząć trening.
+            </p>
           )}
         </div>
 
@@ -685,27 +773,29 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
         </aside>
       </div>
 
-      <div className="sticky bottom-0 z-20 border-t border-border bg-background/90 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl md:px-8">
-        <div className="mx-auto flex w-full max-w-7xl gap-3">
-          <Button
-            size="lg"
-            className="h-14 flex-1 rounded-2xl text-base font-semibold"
-            onClick={() => (isLast ? setIsFinishDialogOpen(true) : goTo(index + 1))}
-          >
-            {isLast ? (
-              <>
-                <Flag className="size-5" aria-hidden="true" />
-                Zakończ trening
-              </>
-            ) : (
-              <>
-                Następne ćwiczenie
-                <ArrowRight className="size-5" aria-hidden="true" />
-              </>
-            )}
-          </Button>
+      {exercise ? (
+        <div className="sticky bottom-0 z-20 border-t border-border bg-background/90 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl md:px-8">
+          <div className="mx-auto flex w-full max-w-7xl gap-3">
+            <Button
+              size="lg"
+              className="h-14 flex-1 rounded-2xl text-base font-semibold"
+              onClick={() => (isLast ? setIsFinishDialogOpen(true) : goTo(index + 1))}
+            >
+              {isLast ? (
+                <>
+                  <Flag className="size-5" aria-hidden="true" />
+                  Zakończ trening
+                </>
+              ) : (
+                <>
+                  Następne ćwiczenie
+                  <ArrowRight className="size-5" aria-hidden="true" />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {isFinishDialogOpen ? (
         <div
