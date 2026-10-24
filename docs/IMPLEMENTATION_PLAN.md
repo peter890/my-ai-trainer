@@ -35,7 +35,7 @@ Wykonano kontrolę najważniejszych twierdzeń audytu na kodzie źródłowym (ko
 - `[x] D-02` Odpowiedź Gemini będzie tekstem zwięzłym (do 150 słów), zgodnie z PRD; UI zostanie dostosowane do tego kontraktu zamiast wymuszać sekcje.
 - `[x] D-03` Na start zakładamy hosting w katalogu głównym domeny. Obsługa podścieżki zostanie dodana dopiero, jeśli będzie wymagana przez wdrożenie.
 - `[x] D-04` OAuth użyje klienta skonfigurowanego po stronie Google; token pozostanie w pamięci, a brak konfiguracji klienta będzie jawnie komunikowany. Dane logowania nie będą potrzebne do funkcji lokalnych.
-- `[x] D-05` Klucz Gemini przechowujemy wyłącznie lokalnie, poza synchronizowanymi danymi i logami; model `gemini-3.8-flash` jest definiowany tylko w `lib/config.ts` (zgodnie z aktualną odpowiedzią Gemini API dla nowych użytkowników).
+- `[x] D-05` Klucz Gemini przechowujemy wyłącznie lokalnie, poza synchronizowanymi danymi i logami; model `gemini-flash-latest` jest definiowany tylko w `lib/config.ts` (zgodnie z aktualną odpowiedzią Gemini API dla nowych użytkowników).
 - `[x] D-06` Zachowujemy pauzę treningu; aktywny czas będzie liczony z timestampów z uwzględnieniem skumulowanych pauz.
 
 ## Etapy realizacji

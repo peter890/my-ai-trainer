@@ -36,6 +36,9 @@ function getHttpErrorMessage(status: number): string {
   if (status === 429) {
     return 'Przekroczono limit żądań Gemini. Spróbuj ponownie za chwilę.'
   }
+  if (status === 503) {
+    return 'Model Gemini jest chwilowo przeciążony. Spróbuj ponownie za chwilę.'
+  }
   return `Gemini nie odpowiedziało poprawnie (HTTP ${status}).`
 }
 
@@ -81,7 +84,7 @@ function extractJsonBlock(text: string): string {
   const trimmed = text.trim()
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed
 
-  const match = trimmed.match(/\{[\s\S]*\}/)
+  const match = trimmed.match(/\{[\s\S]*}/)
   if (!match) {
     throw new Error('Gemini zwróciło odpowiedź, której nie udało się odczytać jako JSON planu.')
   }

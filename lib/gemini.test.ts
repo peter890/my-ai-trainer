@@ -38,6 +38,14 @@ describe('testGeminiConnection', () => {
       'Nie można połączyć się z Gemini.',
     )
   })
+
+  it('explains temporary model overloads without blaming the API key', async () => {
+    const fetcher = vi.fn(async () => new Response('', { status: 503 }))
+
+    await expect(testGeminiConnection('api-key', fetcher)).rejects.toThrow(
+      'Model Gemini jest chwilowo przeciążony.',
+    )
+  })
 })
 
 describe('generateWorkoutAnalysis', () => {
