@@ -9,7 +9,7 @@ import {
   TrainerBackupSchema,
   type TrainerBackup,
 } from './backup'
-import { saveGeminiApiKey } from './local-secrets'
+import { saveAiApiKey } from './local-secrets'
 import { getExercises, getProfile, saveExercise, saveProfile } from './repositories'
 
 const localTimestamp = '2026-10-14T18:30:00.000Z'
@@ -191,7 +191,7 @@ describe('trainer backup', () => {
     await saveExercise(createExercise('local-only', localTimestamp), database)
 
     const secrets = createMemoryStorage()
-    saveGeminiApiKey('test-gemini-secret-never-export', secrets)
+    saveAiApiKey('gemini', 'test-gemini-secret-never-export', secrets)
     const exported = await createTrainerBackup(database)
     expect(JSON.stringify(exported)).not.toContain('test-gemini-secret-never-export')
     expect(exported.data.exercises).toHaveLength(1)

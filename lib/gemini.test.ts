@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { GEMINI_MODEL } from './config'
-import { generateWorkoutAnalysis, generateWorkoutPlanWithGemini, testGeminiConnection } from './gemini'
+import {
+  generateWorkoutAnalysis,
+  generateWorkoutPlan,
+  testAiConnection,
+} from './ai'
 import type { Exercise } from './trainer-data'
 
-describe('testGeminiConnection', () => {
+describe('testAiConnection', () => {
   it('sends the API key in a request header and validates the response', async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'OK' }] } }] }), {
@@ -11,7 +15,7 @@ describe('testGeminiConnection', () => {
       }),
     )
 
-    await expect(testGeminiConnection('api-key', fetcher)).resolves.toBeUndefined()
+    await expect(testAiConnection('gemini', 'api-key', fetcher)).resolves.toBeUndefined()
 
     const call = (fetcher as any).mock.calls[0] as [string, RequestInit]
     const [url, request] = call
@@ -27,7 +31,7 @@ describe('testGeminiConnection', () => {
   it('reports an HTTP error without logging request credentials', async () => {
     const fetcher = vi.fn(async () => new Response('', { status: 403 }))
 
-    await expect(testGeminiConnection('api-key', fetcher)).rejects.toThrow(
+    await expect(testAiConnection('gemini', 'api-key', fetcher)).rejects.toThrow(
       'Gemini odrzuciło klucz API.',
     )
   })
@@ -37,7 +41,7 @@ describe('testGeminiConnection', () => {
       throw new TypeError('Failed to fetch')
     })
 
-    await expect(testGeminiConnection('api-key', fetcher)).rejects.toThrow(
+    await expect(testAiConnection('gemini', 'api-key', fetcher)).rejects.toThrow(
       'Nie można połączyć się z Gemini.',
     )
   })
@@ -45,7 +49,7 @@ describe('testGeminiConnection', () => {
   it('explains temporary model overloads without blaming the API key', async () => {
     const fetcher = vi.fn(async () => new Response('', { status: 503 }))
 
-    await expect(testGeminiConnection('api-key', fetcher)).rejects.toThrow(
+    await expect(testAiConnection('gemini', 'api-key', fetcher)).rejects.toThrow(
       'Model Gemini jest chwilowo przeciążony.',
     )
   })
@@ -55,9 +59,27 @@ describe('testGeminiConnection', () => {
       new Response(JSON.stringify({ candidates: [{ content: {} }] }), { status: 200 }),
     )
 
-    await expect(testGeminiConnection('api-key', fetcher)).rejects.toThrow(
+    await expect(testAiConnection('gemini', 'api-key', fetcher)).rejects.toThrow(
       'Gemini nie zwróciło tekstowej odpowiedzi testowej.',
     )
+  })
+
+  it('sends OpenRouter requests in the chat completions format', async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: 'OK' } }] }), { status: 200 }),
+    )
+
+    await expect(testAiConnection('openrouter', 'openrouter-key', fetcher)).resolves.toBeUndefined()
+
+    const [url, request] = (fetcher as any).mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions')
+    expect(new Headers(request.headers as HeadersInit).get('authorization')).toBe('Bearer openrouter-key')
+    expect(JSON.parse(request.body as string)).toMatchObject({
+      model: 'google/gemini-3.8-flash',
+      messages: [{ role: 'user', content: 'Odpowiedz jednym słowem: OK.' }],
+      max_tokens: 32,
+      temperature: 0,
+    })
   })
 })
 
@@ -100,7 +122,7 @@ describe('generateWorkoutAnalysis', () => {
     )
 
     await expect(
-      generateWorkoutAnalysis(workout, undefined, previousWorkouts, 'api-key', fetcher),
+      generateWorkoutAnalysis(workout, undefined, previousWorkouts, 'gemini', 'api-key', fetcher),
     ).resolves.toMatchObject({
       feedback_text: 'Objętość jest dobra. Zmniejsz ciężar o 2,5 kg przy wyciskaniu.',
     })
@@ -136,7 +158,7 @@ describe('generateWorkoutAnalysis', () => {
       post_workout_user_notes: 'Dobra sesja.',
     }
 
-    await expect(generateWorkoutAnalysis(workout, undefined, [], 'api-key', fetcher)).rejects.toThrow(
+    await expect(generateWorkoutAnalysis(workout, undefined, [], 'gemini', 'api-key', fetcher)).rejects.toThrow(
       'Przekroczono limit żądań Gemini.',
     )
   })
@@ -161,13 +183,13 @@ describe('generateWorkoutAnalysis', () => {
       readiness_energy_score: 4,
     }
 
-    await expect(generateWorkoutAnalysis(workout, undefined, [], 'api-key', fetcher)).rejects.toThrow(
+    await expect(generateWorkoutAnalysis(workout, undefined, [], 'gemini', 'api-key', fetcher)).rejects.toThrow(
       'Analiza AI nie może przekraczać 150 słów.',
     )
   })
 })
 
-describe('generateWorkoutPlanWithGemini', () => {
+describe('generateWorkoutPlan', () => {
   const availableExercises: Exercise[] = [
     {
       id: 'bench_press',
@@ -225,7 +247,7 @@ describe('generateWorkoutPlanWithGemini', () => {
     )
 
     await expect(
-      generateWorkoutPlanWithGemini(
+      generateWorkoutPlan(
         {
           goal: 'hypertrophy',
           level: 'intermediate',
@@ -234,6 +256,7 @@ describe('generateWorkoutPlanWithGemini', () => {
           exercises: availableExercises,
           prefer_favorites: true,
         },
+        'gemini',
         'api-key',
         fetcher,
       ),
@@ -283,7 +306,7 @@ describe('generateWorkoutPlanWithGemini', () => {
     )
 
     await expect(
-      generateWorkoutPlanWithGemini(
+      generateWorkoutPlan(
         {
           goal: 'hypertrophy',
           level: 'intermediate',
@@ -292,6 +315,7 @@ describe('generateWorkoutPlanWithGemini', () => {
           exercises: availableExercises,
           prefer_favorites: true,
         },
+        'gemini',
         'api-key',
         fetcher,
       ),

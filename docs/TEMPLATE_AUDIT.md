@@ -25,7 +25,7 @@ Szablon to **kompletny, dobrze zrobiony prototyp UI** (Next.js 16, React 19, Tai
 | `exercises/plan-generator.tsx` | Generator planu (cel, poziom, dni, czas) | 6.2 | **lokalny algorytm + `setTimeout`, bez Gemini** |
 | `profile/biometrics-card.tsx` | Płeć, wiek, wzrost, waga | 2.1 | mock (`'29'`, `'182'`), brak części pól |
 | `profile/weight-history-card.tsx` | Dodawanie wagi | 2.2 | stan lokalny |
-| `profile/gemini-card.tsx` | Klucz API | 2.3 | bez zapisu, test klucza to `setTimeout` |
+| `profile/ai-provider-card.tsx` | Dostawca i klucz API | 2.3 | lokalny wybór providera, zapis klucza i test połączenia |
 | `profile/drive-sync-card.tsx` | Synchronizacja Drive | 1.2 | w całości atrapa |
 | `weight-chart.tsx` | Wykres wagi (Recharts) | 2.2 | tylko waga, bez tonażu |
 

@@ -14,7 +14,7 @@ import {
   type WorkoutPlan,
 } from './schemas'
 import { clearDriveSyncQueue, disconnectGoogleDrive, enqueueDriveSync } from './google-drive'
-import { removeGeminiApiKey } from './local-secrets'
+import { removeAllAiApiKeys } from './local-secrets'
 
 const TrainerBackupDataSchema = z
   .object({
@@ -264,7 +264,7 @@ export async function deleteLocalTrainerData(databaseOverride?: IDBPDatabase<Tra
 
   clearDriveSyncQueue()
   disconnectGoogleDrive()
-  removeGeminiApiKey()
+  removeAllAiApiKeys()
 }
 
 export function parseTrainerBackupJson(json: string): TrainerBackup {

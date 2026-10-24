@@ -29,7 +29,7 @@ Aplikacja odpowiada bezpośrednio 5 głównym filarom roli żywego Trenera Perso
 * Architektura: 100% Serverless / Client-Side Only (Brak własnej infrastruktury serwerowej).
 * Przechowywanie Danych i Autoryzacja: Google OAuth 2.0 + Google Drive REST API (Folder AppData dla plików JSON).
 * Baza Lokalna (Offline): IndexedDB (dla pełnej niezawodności na siłowni bez zasięgu).
-* Silnik AI: Gemini API z własnym kluczem API użytkownika; identyfikator aktualnie wspieranego modelu jest centralnie konfigurowany w `lib/config.ts`. Obsługa lokalnego Gemini Nano jest opcjonalna.
+* Silnik AI: Gemini API lub OpenRouter z własnym kluczem API użytkownika; identyfikatory modeli są centralnie konfigurowane w `lib/config.ts`. Obsługa lokalnego Gemini Nano jest opcjonalna.
 
 ---
 
@@ -38,12 +38,12 @@ Aplikacja odpowiada bezpośrednio 5 głównym filarom roli żywego Trenera Perso
 ### MODUŁ 1: Uwierzytelnianie i Synchronizacja Danych
 * 1.1. Logowanie Google (OAuth 2.0): Bezpieczne logowanie przez konto Google z zapisem tokenu w pamięci przeglądarki.
 * 1.2. Synchronizacja z Google Drive AppData: Odczyt i zapis plików user_profile.json oraz workouts_history.json bezpośrednio w ukrytym folderze aplikacji na Google Drive użytkownika.
-* 1.3. Działanie Offline-First: Pełna obsługa rejestracji treningu działa offline za pomocą IndexedDB. Synchronizacja z Google Drive oraz zapytania do Gemini API wykonują się automatycznie po odzyskaniu połączenia z siecią.
+* 1.3. Działanie Offline-First: Pełna obsługa rejestracji treningu działa offline za pomocą IndexedDB. Synchronizacja z Google Drive oraz zapytania do wybranego dostawcy AI wykonują się automatycznie po odzyskaniu połączenia z siecią.
 
 ### MODUŁ 2: Profil Użytkownika i Dane Biometryczne
 * 2.1. Statyczne Dane Biometryczne: Płeć, Wiek, Wzrost (cm), Poziom zaawansowania (Początkujący/Średniozaawansowany/Zaawansowany), Główny cel (Hipertrofia, Siła, Redukcja, Wytrzymałość).
 * 2.2. Śledzenie Wagi i Postępów: Szybkie zapisywanie wagi z datą oraz wykres liniowy łączący wagę ciała z całkowitym tonażem treningowym.
-* 2.3. Ustawienia AI: Pole do wprowadzenia prywatnego GEMINI_API_KEY (zapisywanego w localStorage) oraz przełącznik między chmurą Gemini API a lokalnym Gemini Nano.
+* 2.3. Ustawienia AI: Wybór dostawcy Gemini API lub OpenRouter oraz pole do wprowadzenia prywatnego klucza (zapisywanego w localStorage). Obsługa lokalnego Gemini Nano pozostaje opcjonalna.
 
 ### MODUŁ 3: Baza Ćwiczeń i Preferencje Treningowe
 * 3.1. Katalog Ćwiczeń: Wbudowana baza podzielona na partie mięśniowe i tagi sprzętu (Sztanga, Hantle, Wyciąg, Maszyna, Kalistenika, Kardio) z opcją dodawania własnych ćwiczeń.
@@ -60,11 +60,11 @@ Aplikacja odpowiada bezpośrednio 5 głównym filarom roli żywego Trenera Perso
 ### MODUŁ 5: Odłożona Finalizacja i Analiza Post-Workout przez AI
 * 5.1. Odłożone Zakończenie Sesji: Przycisk "Zakończ sesję na siłowni" zatrzymuje stoper i zapisuje dane lokalnie, pozwalając na dokończenie podsumowania w domu.
 * 5.2. Ankieta Końcowa w Domu: Ocena poziomu energii/zmęczenia (skala 1-5) oraz pole tekstowe na ogólne uwagi z treningu.
-* 5.3. Analiza AI (Gemini): Wysyłanie zestawienia sesji, wybranych danych profilu i podsumowań maksymalnie 3 ostatnich treningów do Gemini API dopiero po wyświetleniu informacji o zakresie danych i uzyskaniu zgody użytkownika. Wyświetlanie karty z wnioskami i zaleceniami na kolejny trening.
+* 5.3. Analiza AI: Wysyłanie zestawienia sesji, wybranych danych profilu i podsumowań maksymalnie 3 ostatnich treningów do wybranego dostawcy AI dopiero po wyświetleniu informacji o zakresie danych i uzyskaniu zgody użytkownika. Wyświetlanie karty z wnioskami i zaleceniami na kolejny trening.
 
 ### MODUŁ 6: Kalendarz, Historia i Generator Planów
 * 6.1. Widok Kalendarza: Widok miesiąca z oznaczonymi dniami treningowymi (budowanie nawyku/streak). Kliknięcie w dzień otwiera historyczne wyniki i analizę AI.
-* 6.2. Generator Planów Treningowych: Opcja wygenerowania przez Gemini gotowego podziału treningowego (np. Push/Pull/Legs) dostosowanego do ulubionych ćwiczeń i profilu.
+* 6.2. Generator Planów Treningowych: Opcja wygenerowania przez wybranego dostawcę AI gotowego podziału treningowego (np. Push/Pull/Legs) dostosowanego do ulubionych ćwiczeń i profilu.
 
 ---
 
@@ -120,7 +120,7 @@ Aplikacja odpowiada bezpośrednio 5 głównym filarom roli żywego Trenera Perso
 
 ```
 
-Klucz API Gemini jest ustawieniem wyłącznie lokalnym. Nie jest częścią `user_profile.json`, kopii zapasowej ani danych synchronizowanych z Google Drive.
+Klucze API wybranego dostawcy są ustawieniami wyłącznie lokalnymi. Nie są częścią `user_profile.json`, kopii zapasowej ani danych synchronizowanych z Google Drive.
 
 ### 5.2. Plik `workouts_history.json`
 
@@ -161,9 +161,9 @@ Klucz API Gemini jest ustawieniem wyłącznie lokalnym. Nie jest częścią `use
 
 ---
 
-## 6. Konstrukcja Promptu dla Gemini API
+## 6. Konstrukcja Promptu dla Dostawcy AI
 
-Po sfinalizowaniu treningu aplikacja wysyła do skonfigurowanego modelu Gemini zapytanie skonstruowane według poniższego wzorca:
+Po sfinalizowaniu treningu aplikacja wysyła do skonfigurowanego modelu wybranego dostawcy AI zapytanie skonstruowane według poniższego wzorca:
 
 ```text
 [PROMPT SYSTEMOWY]
@@ -200,4 +200,4 @@ Wykonane ćwiczenia i serie:
 1. Faza 1: Szablon UI (Eksport z v0.dev) – Skonfigurowanie projektu React/Next.js z Tailwind CSS i shadcn/ui oraz zaimportowanie widoków.
 2. Faza 2: Stan Lokalny i Rejestrator Offline – Zaimplementowanie stanu React (useReducer/Zustand) dla aktywnego treningu, logiki Smart Fill, Screen Wake Lock API oraz stopera przerw.
 3. Faza 3: Logowanie i Google Drive – Integracja biblioteki @react-oauth/google i napisanie modułu lib/googleDrive.ts do obsługi AppData API w trybie offline-first.
-4. Faza 4: Integracja Gemini API – Stworzenie modułu lib/gemini.ts łączącego formularz końcowy z odpowiedzą AI.
+4. Faza 4: Integracja dostawcy AI – Stworzenie modułu `lib/ai.ts` łączącego formularz końcowy z odpowiedzią AI.

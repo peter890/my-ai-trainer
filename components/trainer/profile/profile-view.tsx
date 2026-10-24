@@ -5,7 +5,7 @@ import { getProfile, saveProfile } from '@/lib/repositories'
 import type { ExperienceLevel, Gender, PrimaryGoal, ProfileDocument } from '@/lib/schemas'
 import { BiometricsCard } from './biometrics-card'
 import { WeightHistoryCard } from './weight-history-card'
-import { GeminiCard } from './gemini-card'
+import { AiProviderCard } from './ai-provider-card'
 import { DriveSyncCard } from './drive-sync-card'
 import { BackupCard } from './backup-card'
 import { RestSettingsCard } from './rest-settings-card'
@@ -228,7 +228,7 @@ export function ProfileView() {
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Profil i ustawienia</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja z Gemini i synchronizacja.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja AI i synchronizacja.</p>
         </div>
         <p role="status" className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           Wczytywanie profilu…
@@ -242,7 +242,7 @@ export function ProfileView() {
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Profil i ustawienia</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja z Gemini i synchronizacja.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja AI i synchronizacja.</p>
         </div>
         <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
           <p className="font-medium">Nie udało się wczytać profilu.</p>
@@ -259,7 +259,7 @@ export function ProfileView() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Profil i ustawienia</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja z Gemini i synchronizacja.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja AI i synchronizacja.</p>
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-2 lg:gap-6">
@@ -285,7 +285,7 @@ export function ProfileView() {
             signal={profile.settings.rest_timer_signal}
             onSignalChange={handleRestTimerSignalChange}
           />
-          <GeminiCard />
+          <AiProviderCard />
         </div>
         <div className="flex flex-col gap-4">
           <WeightHistoryCard weights={weights} onAdd={addWeight} />

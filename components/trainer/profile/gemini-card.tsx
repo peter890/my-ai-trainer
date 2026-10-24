@@ -5,31 +5,41 @@ import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Trash2 } from 'lucide-rea
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { testGeminiConnection } from '@/lib/gemini'
+import { testAiConnection } from '@/lib/ai'
 import {
-  getGeminiApiKeySnapshot,
-  INVALID_GEMINI_API_KEY_SNAPSHOT,
-  removeGeminiApiKey,
-  saveGeminiApiKey,
-  subscribeToGeminiApiKey,
+  getAiApiKeySnapshot,
+  getAiProviderSnapshot,
+  INVALID_AI_API_KEY_SNAPSHOT,
+  removeAiApiKey,
+  saveAiApiKey,
+  saveAiProvider,
+  subscribeToAiApiKey,
+  subscribeToAiProvider,
+  type AiProvider,
 } from '@/lib/local-secrets'
 import { cn } from '@/lib/utils'
 
 type Status = 'idle' | 'testing' | 'ok' | 'error'
 
 export function GeminiCard() {
+  const provider = useSyncExternalStore(
+    subscribeToAiProvider,
+    getAiProviderSnapshot,
+    () => 'gemini' as AiProvider,
+  )
   const storedApiKey = useSyncExternalStore(
-    subscribeToGeminiApiKey,
-    getGeminiApiKeySnapshot,
+    (onChange) => subscribeToAiApiKey(provider, onChange),
+    () => getAiApiKeySnapshot(provider),
     () => '',
   )
   const [editedApiKey, setEditedApiKey] = useState<string>()
   const apiKey =
-    editedApiKey ?? (storedApiKey === INVALID_GEMINI_API_KEY_SNAPSHOT ? '' : storedApiKey)
+    editedApiKey ?? (storedApiKey === INVALID_AI_API_KEY_SNAPSHOT ? '' : storedApiKey)
   const [visible, setVisible] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
-  const invalidStoredKey = storedApiKey === INVALID_GEMINI_API_KEY_SNAPSHOT
+  const invalidStoredKey = storedApiKey === INVALID_AI_API_KEY_SNAPSHOT
+  const providerLabel = provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'
   const isSaved = Boolean(storedApiKey && !invalidStoredKey && storedApiKey === apiKey)
   const visibleError = invalidStoredKey
     ? 'Nie udało się odczytać lokalnego klucza. Wprowadź go ponownie.'
@@ -39,19 +49,19 @@ export function GeminiCard() {
     setStatus('testing')
     setError('')
     try {
-      const savedKey = saveGeminiApiKey(apiKey)
+      const savedKey = saveAiApiKey(provider, apiKey)
       setEditedApiKey(savedKey)
-      await testGeminiConnection(savedKey)
+      await testAiConnection(provider, savedKey)
       setStatus('ok')
     } catch (cause) {
       setStatus('error')
-      setError(cause instanceof Error ? cause.message : 'Nie udało się przetestować połączenia z Gemini.')
+      setError(cause instanceof Error ? cause.message : `Nie udało się przetestować połączenia z ${providerLabel}.`)
     }
   }
 
   const removeKey = () => {
     try {
-      removeGeminiApiKey()
+      removeAiApiKey(provider)
       setEditedApiKey('')
       setStatus('idle')
       setError('')
@@ -61,14 +71,21 @@ export function GeminiCard() {
     }
   }
 
+  const changeProvider = (nextProvider: AiProvider) => {
+    saveAiProvider(nextProvider)
+    setEditedApiKey(undefined)
+    setStatus('idle')
+    setError('')
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 font-semibold">
           <KeyRound className="size-4 text-primary" aria-hidden="true" />
-          Klucz API Gemini
+          Dostawca AI
         </CardTitle>
-        <CardDescription>Wymagany do analiz po treningu i generatora planów.</CardDescription>
+        <CardDescription>Wybierz usługę i klucz używany do analiz oraz generatora planów.</CardDescription>
         <CardAction>
           <span
             className={cn(
@@ -93,10 +110,20 @@ export function GeminiCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="gemini-key">Klucz API</Label>
+          <Label htmlFor="ai-provider">Usługa AI</Label>
+          <select
+            id="ai-provider"
+            value={provider}
+            onChange={(event) => changeProvider(event.target.value as AiProvider)}
+            className="h-11 rounded-lg border border-input bg-secondary/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <option value="gemini">Google Gemini</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+          <Label htmlFor="ai-key">Klucz API {providerLabel}</Label>
           <div className="relative">
             <Input
-              id="gemini-key"
+              id="ai-key"
               type={visible ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => {
@@ -104,7 +131,7 @@ export function GeminiCard() {
                 setStatus('idle')
                 setError('')
               }}
-              placeholder="AIza…"
+              placeholder={provider === 'gemini' ? 'AIza…' : 'sk-or-v1-…'}
               autoComplete="off"
               spellCheck={false}
               className="h-11 pr-11 font-mono"
@@ -119,7 +146,7 @@ export function GeminiCard() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Klucz zostaje zapisany wyłącznie lokalnie w tej przeglądarce. Test połączenia wysyła go bezpośrednio do Google.
+            Klucz zostaje zapisany wyłącznie lokalnie w tej przeglądarce i jest wysyłany bezpośrednio do {providerLabel}.
           </p>
         </div>
 

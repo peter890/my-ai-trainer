@@ -66,7 +66,7 @@ export function BackupCard() {
 
   const handleDelete = async () => {
     const confirmed = window.confirm(
-      'Usunąć lokalny profil, ćwiczenia, plany, treningi, klucz Gemini i zapisane połączenie Drive? Kopia w Google Drive nie zostanie usunięta.',
+      'Usunąć lokalny profil, ćwiczenia, plany, treningi, klucze AI i zapisane połączenie Drive? Kopia w Google Drive nie zostanie usunięta.',
     )
     if (!confirmed) return
 
@@ -93,7 +93,7 @@ export function BackupCard() {
       <CardHeader>
         <CardTitle className="font-semibold">Kopia zapasowa i dane</CardTitle>
         <CardDescription>
-          Eksportuj dane do pliku JSON albo scal wcześniej utworzoną kopię. Klucz Gemini nie jest eksportowany.
+          Eksportuj dane do pliku JSON albo scal wcześniej utworzoną kopię. Klucze AI nie są eksportowane.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

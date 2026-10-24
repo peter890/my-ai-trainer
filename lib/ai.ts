@@ -1,21 +1,16 @@
 import { z } from 'zod'
-import { GEMINI_MODEL } from './config'
-import { GeminiApiKeySchema, getGeminiApiKey } from './local-secrets'
+import { getAiProviderAdapter } from './ai-provider-registry'
+import {
+  AiProviderRequestError,
+  AiProviderSchema,
+  type AiFetcher,
+  type AiProvider,
+} from './ai-provider'
+import { getAiApiKey, parseAiApiKey } from './local-secrets'
 import { AiAnalysisFeedbackSchema, GeneratedWorkoutPlanSchema } from './schemas'
 import type { ProfileDocument, Workout } from './schemas'
 import type { Exercise as ExerciseView } from './trainer-data'
 
-const GeminiTextResponseSchema = z.object({
-  candidates: z
-    .array(
-      z.object({
-        content: z.object({
-          parts: z.array(z.object({ text: z.string().optional() })).optional(),
-        }),
-      }),
-    )
-    .min(1),
-})
 const GeminiAnalysisSchema = z.object({
   feedback_text: AiAnalysisFeedbackSchema,
 })
@@ -23,93 +18,71 @@ const GeminiAnalysisSchema = z.object({
 const PlanGenerationGoalSchema = z.enum(['hypertrophy', 'strength', 'weight_loss', 'endurance'])
 const PlanGenerationLevelSchema = z.enum(['beginner', 'intermediate', 'advanced'])
 
-type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
-
-function buildGeminiUrl() {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+function getProviderLabel(provider: AiProvider): string {
+  return provider === 'openrouter' ? 'OpenRouter' : 'Gemini'
 }
 
-function getHttpErrorMessage(status: number): string {
+function getHttpErrorMessage(provider: AiProvider, status: number): string {
+  const providerLabel = getProviderLabel(provider)
+  if (status === 0) {
+    return `Nie można połączyć się z ${providerLabel}. Sprawdź połączenie internetowe i spróbuj ponownie.`
+  }
   if (status === 401 || status === 403) {
-    return 'Gemini odrzuciło klucz API. Sprawdź klucz w profilu i spróbuj ponownie.'
+    return 'Dostawca AI odrzucił klucz API. Sprawdź klucz w profilu i spróbuj ponownie.'
   }
   if (status === 429) {
-    return 'Przekroczono limit żądań Gemini. Spróbuj ponownie za chwilę.'
+    return `Przekroczono limit żądań ${providerLabel}. Spróbuj ponownie za chwilę.`
   }
   if (status === 503) {
-    return 'Model Gemini jest chwilowo przeciążony. Spróbuj ponownie za chwilę.'
+    return `Model ${providerLabel} jest chwilowo przeciążony. Spróbuj ponownie za chwilę.`
   }
-  return `Gemini nie odpowiedziało poprawnie (HTTP ${status}).`
+  return `${providerLabel} nie odpowiedział poprawnie (HTTP ${status}).`
 }
 
-async function requestGemini(
-  fetcher: Fetcher,
+function getValidApiKey(provider: AiProvider, apiKey?: string): string {
+  const value = apiKey ?? getAiApiKey(provider)
+  return parseAiApiKey(provider, value)
+}
+
+async function requestText(
+  provider: AiProvider,
   apiKey: string,
-  body: Record<string, unknown>,
-): Promise<Response> {
-  let response: Response
+  request: Parameters<ReturnType<typeof getAiProviderAdapter>['requestText']>[0],
+  fetcher: AiFetcher,
+): Promise<string> {
   try {
-    response = await fetcher(buildGeminiUrl(), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify(body),
-    })
+    return await getAiProviderAdapter(provider).requestText(request, apiKey, fetcher)
   } catch (cause) {
-    if (cause instanceof TypeError) {
-      throw new Error('Nie można połączyć się z Gemini. Sprawdź połączenie internetowe i spróbuj ponownie.')
+    if (cause instanceof AiProviderRequestError) {
+      throw new Error(getHttpErrorMessage(cause.provider, cause.status))
+    }
+    if (cause instanceof z.ZodError) {
+      throw new Error(`${getProviderLabel(provider)} zwrócił niepoprawną odpowiedź.`)
     }
     throw cause
   }
-
-  if (!response.ok) {
-    throw new Error(getHttpErrorMessage(response.status))
-  }
-
-  return response
 }
 
-function extractTextFromResponse(payload: unknown): string {
-  const result = GeminiTextResponseSchema.parse(payload)
-  const textParts = result.candidates.flatMap((candidate) =>
-    (candidate.content.parts ?? []).map((part) => part.text ?? '').filter(Boolean),
+export async function testAiConnection(
+  provider: AiProvider,
+  apiKey: unknown,
+  fetcher: AiFetcher = fetch,
+): Promise<void> {
+  const validProvider = AiProviderSchema.parse(provider)
+  const validApiKey = getValidApiKey(validProvider, typeof apiKey === 'string' ? apiKey : undefined)
+  const text = await requestText(
+    validProvider,
+    validApiKey,
+    {
+      prompt: 'Odpowiedz jednym słowem: OK.',
+      maxOutputTokens: 32,
+      temperature: 0,
+    },
+    fetcher,
   )
 
-  return textParts.join('\n').trim()
-}
-
-function extractJsonBlock(text: string): string {
-  const trimmed = text.trim()
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed
-
-  const match = trimmed.match(/\{[\s\S]*}/)
-  if (!match) {
-    throw new Error('Gemini zwróciło odpowiedź, której nie udało się odczytać jako JSON planu.')
-  }
-
-  return match[0]
-}
-
-function parseJson<T>(text: string): T {
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    throw new Error('Gemini zwróciło niepoprawny JSON planu treningowego.')
-  }
-}
-
-export async function testGeminiConnection(apiKey: unknown, fetcher: Fetcher = fetch): Promise<void> {
-  const validApiKey = GeminiApiKeySchema.parse(apiKey)
-  const response = await requestGemini(fetcher, validApiKey, {
-    contents: [{ parts: [{ text: 'Odpowiedz jednym słowem: OK.' }] }],
-    generationConfig: { maxOutputTokens: 32, temperature: 0 },
-  })
-
-  const text = extractTextFromResponse(await response.json())
   if (!text) {
-    throw new Error('Gemini nie zwróciło tekstowej odpowiedzi testowej.')
+    throw new Error('Dostawca AI nie zwrócił tekstowej odpowiedzi testowej.')
   }
 }
 
@@ -117,10 +90,12 @@ export async function generateWorkoutAnalysis(
   workout: Workout,
   profile: ProfileDocument | undefined,
   previousWorkouts: Workout[],
+  provider: AiProvider,
   apiKey?: string,
-  fetcher: Fetcher = fetch,
+  fetcher: AiFetcher = fetch,
 ): Promise<z.infer<typeof GeminiAnalysisSchema>> {
-  const validApiKey = GeminiApiKeySchema.parse(apiKey ?? getGeminiApiKey())
+  const validProvider = AiProviderSchema.parse(provider)
+  const validApiKey = getValidApiKey(validProvider, apiKey)
   const recentWorkoutSummaries = previousWorkouts.slice(0, 3).map((item) => ({
     plan_name: item.plan_name,
     set_count: item.exercises.reduce((count, exercise) => count + exercise.sets.length, 0),
@@ -172,20 +147,18 @@ ZADANIE
 2. Odnieś się do notatek dotyczących bólu, kontuzji lub zadyszki (dostosuj ciężary/ćwiczenia na przyszłość).
 3. Podaj konkretne wskazówki do wdrożenia na następnym treningu.`
 
-  const response = await requestGemini(fetcher, validApiKey, {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 512, temperature: 0.4 },
-  })
-
-  const text = extractTextFromResponse(await response.json())
-  if (!text) {
-    throw new Error('Gemini nie zwróciło treści analizy treningu.')
-  }
+  const text = await requestText(
+    validProvider,
+    validApiKey,
+    { prompt, maxOutputTokens: 512, temperature: 0.4 },
+    fetcher,
+  )
+  if (!text) throw new Error('AI nie zwróciło treści analizy treningu.')
 
   return GeminiAnalysisSchema.parse({ feedback_text: text })
 }
 
-export async function generateWorkoutPlanWithGemini(
+export async function generateWorkoutPlan(
   input: {
     goal: z.infer<typeof PlanGenerationGoalSchema>
     level: z.infer<typeof PlanGenerationLevelSchema>
@@ -195,10 +168,12 @@ export async function generateWorkoutPlanWithGemini(
     profile?: ProfileDocument
     prefer_favorites: boolean
   },
+  provider: AiProvider,
   apiKey?: string,
-  fetcher: Fetcher = fetch,
+  fetcher: AiFetcher = fetch,
 ): Promise<z.infer<typeof GeneratedWorkoutPlanSchema>> {
-  const validApiKey = GeminiApiKeySchema.parse(apiKey ?? getGeminiApiKey())
+  const validProvider = AiProviderSchema.parse(provider)
+  const validApiKey = getValidApiKey(validProvider, apiKey)
   const goal = PlanGenerationGoalSchema.parse(input.goal)
   const level = PlanGenerationLevelSchema.parse(input.level)
   const daysPerWeek = z.number().int().min(2).max(6).parse(input.days_per_week)
@@ -276,39 +251,49 @@ ${JSON.stringify(
     2,
   )}`
 
-  const response = await requestGemini(fetcher, validApiKey, {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      maxOutputTokens: 1024,
-      temperature: 0.3,
-      responseMimeType: 'application/json',
-    },
-  })
-
-  const text = extractTextFromResponse(await response.json())
-  if (!text) {
-    throw new Error('Gemini nie zwróciło treści planu treningowego.')
-  }
+  const text = await requestText(
+    validProvider,
+    validApiKey,
+    { prompt, maxOutputTokens: 1024, temperature: 0.3, responseFormat: 'json' },
+    fetcher,
+  )
+  if (!text) throw new Error('AI nie zwróciło treści planu treningowego.')
 
   const parsed = GeneratedWorkoutPlanSchema.parse(parseJson(extractJsonBlock(text)))
-
   if (parsed.days.length !== daysPerWeek) {
-    throw new Error('Gemini zwróciło plan z nieprawidłową liczbą dni treningowych.')
+    throw new Error('AI zwróciło plan z nieprawidłową liczbą dni treningowych.')
   }
 
   const allowedExerciseIds = new Set(exercises.map((exercise) => exercise.id))
   for (const day of parsed.days) {
     const dayIds = day.exercises.map((exercise) => exercise.exercise_id)
     if (new Set(dayIds).size !== dayIds.length) {
-      throw new Error(`Gemini zwróciło zduplikowane ćwiczenie w dniu "${day.name}".`)
+      throw new Error(`AI zwróciło zduplikowane ćwiczenie w dniu "${day.name}".`)
     }
 
     for (const exercise of day.exercises) {
       if (!allowedExerciseIds.has(exercise.exercise_id)) {
-        throw new Error(`Gemini zwróciło ćwiczenie spoza katalogu: ${exercise.exercise_id}.`)
+        throw new Error(`AI zwróciło ćwiczenie spoza katalogu: ${exercise.exercise_id}.`)
       }
     }
   }
 
   return parsed
+}
+
+function extractJsonBlock(text: string): string {
+  const trimmed = text.trim()
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed
+
+  const match = trimmed.match(/\{[\s\S]*}/)
+  if (!match) throw new Error('AI zwróciło odpowiedź, której nie udało się odczytać jako JSON planu.')
+  return match[0]
+}
+
+function parseJson<T>(text: string): T {
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error('AI zwróciło niepoprawny JSON planu treningowego.')
+  }
 }

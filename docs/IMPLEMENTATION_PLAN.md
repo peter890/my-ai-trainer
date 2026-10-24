@@ -35,7 +35,7 @@ Wykonano kontrolę najważniejszych twierdzeń audytu na kodzie źródłowym (ko
 - `[x] D-02` Odpowiedź Gemini będzie tekstem zwięzłym (do 150 słów), zgodnie z PRD; UI zostanie dostosowane do tego kontraktu zamiast wymuszać sekcje.
 - `[x] D-03` Na start zakładamy hosting w katalogu głównym domeny. Obsługa podścieżki zostanie dodana dopiero, jeśli będzie wymagana przez wdrożenie.
 - `[x] D-04` OAuth użyje klienta skonfigurowanego po stronie Google; token pozostanie w pamięci, a brak konfiguracji klienta będzie jawnie komunikowany. Dane logowania nie będą potrzebne do funkcji lokalnych.
-- `[x] D-05` Klucz Gemini przechowujemy wyłącznie lokalnie, poza synchronizowanymi danymi i logami; model `gemini-flash-latest` jest definiowany tylko w `lib/config.ts` (zgodnie z aktualną odpowiedzią Gemini API dla nowych użytkowników).
+- `[x] D-05` Klucze wybranego dostawcy AI (Gemini lub OpenRouter) przechowujemy wyłącznie lokalnie, poza synchronizowanymi danymi i logami; modele są definiowane tylko w `lib/config.ts`.
 - `[x] D-06` Zachowujemy pauzę treningu; aktywny czas będzie liczony z timestampów z uwzględnieniem skumulowanych pauz.
 
 ## Etapy realizacji
@@ -61,7 +61,7 @@ Status etapu: **[x] zakończony**
 - `[x] E1.3` Dodać skrypty typecheck, lint i test oraz konfigurację ESLint i Vitest.
 - `[x] E1.4` Usunąć Analytics i `generator: 'v0.app'`, zgodnie z założeniem prywatności.
 - `[x] E1.5` Skonfigurować i zweryfikować Next.js static export; dodać `force-static` dla manifestu wymaganego przez Next.js 16.
-- `[x] E1.6` Dodać `lib/config.ts` z jedyną definicją `GEMINI_MODEL`; model nie jest wpisywany w komponentach.
+- `[x] E1.6` Dodać `lib/config.ts` z centralnymi definicjami modeli dostawców AI; modele nie są wpisywane w komponentach.
 
 **Kryterium akceptacji:** typecheck, lint, testy i build/eksport przechodzą; build nie ukrywa błędów typów; nie wysyła telemetrii nieprzewidzianej przez PRD.
 
@@ -87,7 +87,7 @@ Zależność: etap 2.
 Status etapu: **[x] zakończony**
 
 - `[x] E3.1` Podłączyć formularze profilu do repozytorium: płeć, wiek, wzrost, poziom, cel, urazy/uwagi oraz historia pomiarów wagi.
-- `[x] E3.2` Zapisywać klucz Gemini wyłącznie lokalnie, umożliwić jego usunięcie i testować połączenie bezpośrednio z API (klucz przesyłany nagłówkiem; brak logowania). Test automatyczny mockuje odpowiedź API; test na prawdziwym koncie wymaga klucza użytkownika.
+- `[x] E3.2` Zapisywać klucz wybranego dostawcy AI wyłącznie lokalnie, umożliwić jego usunięcie i testować połączenie bezpośrednio z API (klucz przesyłany nagłówkiem; brak logowania). Test automatyczny mockuje odpowiedź API; test na prawdziwym koncie wymaga klucza użytkownika.
 - `[x] E3.3a` Podłączyć katalog wbudowany i dodawanie ćwiczeń własnych do IndexedDB; utrwalać preferencje ulubionych i wykluczonych.
 - `[x] E3.3b` Dodać osobny stan aktywności ćwiczenia i dopiąć go do filtrowania oraz generowania planów. Migracja IndexedDB ustawia wcześniejsze ćwiczenia jako aktywne.
 - `[x] E3.4a` Ujednolicić listę sprzętu zgodnie z PRD i zapisać `rest_type` dla nowych ćwiczeń.
@@ -123,13 +123,13 @@ Zależność: etapy 2 i 4.
 
 **Kryterium akceptacji:** aktywna sesja nie ginie po przeładowaniu; mierzone czasy wynikają z timestampów i pozostają prawidłowe po uśpieniu karty.
 
-### Etap 6 — Odłożona finalizacja i analiza Gemini
+### Etap 6 — Odłożona finalizacja i analiza AI
 
 Zależność: etapy 2, 3 i 5.
 
 - `[x] E6.1` Zapisywać zakończoną sesję lokalnie jako oczekującą na finalizację i obsłużyć kolejkę wielu treningów oczekujących na pulpicie.
 - `[x] E6.2` Zapisywać ankietę energii 1–5 i uwagi użytkownika z walidacją, automatycznym zapisem i możliwością późniejszego wznowienia; pozwolić zapisać trening bez analizy AI.
-- `[x] E6.3` Utworzyć moduł Gemini używający modelu z `lib/config.ts`; wysyłać tylko wymagany kontekst i wyłącznie po jasnej informacji/zgodzie użytkownika.
+- `[x] E6.3` Utworzyć warstwę dostawcy AI używającą modelu z `lib/config.ts`; wysyłać tylko wymagany kontekst i wyłącznie po jasnej informacji/zgodzie użytkownika.
 - `[x] E6.4` Obsłużyć brak sieci, błędny/nieobecny klucz, limity i błędy API bez utraty finalizacji; udostępnić ponowienie.
 - `[x] E6.5` Ujednolicić kontrakt odpowiedzi z decyzją D-02; walidować dane odpowiedzi Zod i wyświetlać w istniejącej karcie.
 - `[x] E6.6` Dodać testy promptu, sanitacji kontekstu, walidacji wyniku i przepływu błędów; nigdy nie logować klucza.
@@ -143,7 +143,7 @@ Zależność: etapy 2–6.
 - `[x] E7.1` Podłączyć kalendarz, listę i szczegóły do rzeczywistych treningów; obsłużyć wiele treningów jednego dnia i daty z rokiem.
 - `[x] E7.2` Wyliczać streak, tygodniowe statystyki i tonaż z historii, bez wartości wpisanych na sztywno.
 - `[x] E7.3` Podłączyć wykres wagi i tonażu do pomiarów oraz sesji; dodać wykres progresji siłowej z jasno opisaną metodą obliczeń.
-- `[x] E7.4` Zastąpić lokalny generator planów prawdziwą generacją Gemini, zapisywać plan, filtrować według profilu/ulubionych/wykluczonych i umożliwić jego start.
+- `[x] E7.4` Zastąpić lokalny generator planów prawdziwą generacją wybranego dostawcy AI, zapisywać plan, filtrować według profilu/ulubionych/wykluczonych i umożliwić jego start.
 - `[x] E7.5` Dodać testy agregacji, granic tygodnia/miesiąca/roku, wielu sesji na dzień i obliczeń progresu.
 
 **Kryterium akceptacji:** wszystkie statystyki i wykresy są reprodukowalne z lokalnych danych; historia działa w trybie offline.
@@ -159,11 +159,11 @@ Zależność: etapy 1–3; synchronizację uruchomić dopiero po stabilizacji sc
 Weryfikacja lokalna E8.3: production static export przechodzi, `/manifest.webmanifest` zwraca poprawny manifest, service worker rejestruje się i aktywuje, a cache zawiera shell oraz fingerprintowane zasoby `/_next/static`. Pełne zaliczenie pozostaje otwarte do ręcznego testu instalacji, startu offline i aktualizacji w Chrome, Firefox i Safari na docelowym hostingu. Narzędzie automatyzacji przeglądarki nie pozwoliło wiarygodnie zasymulować przeładowania offline, ponieważ tryb `setOffline` blokował żądanie przed obsługą service workera.
 - `[x] E8.4` Zaimplementować Google OAuth i Drive AppData bez własnego backendu. Krótkotrwały access token jest przechowywany w localStorage do wygaśnięcia; po wygaśnięciu wymagane jest ponowne połączenie.
 - `[x] E8.5` Synchronizować wersjonowane dane z kolejką zmian offline, wykrywaniem konfliktów i jawnymi stanami błędu/ponowienia. Synchronizacja jest uruchamiana ręcznie z profilu; błędy nie czyszczą kolejki, a konflikt nie nadpisuje repliki.
-- `[x] E8.6` Dodać eksport/import kopii zapasowej oraz usuwanie danych; walidować każdy import schematem Zod. Import scala dane po ID i zachowuje nowszy rekord według `updated_at` (remisy zachowują dane lokalne); klucz Gemini nie jest eksportowany.
+- `[x] E8.6` Dodać eksport/import kopii zapasowej oraz usuwanie danych; walidować każdy import schematem Zod. Import scala dane po ID i zachowuje nowszy rekord według `updated_at` (remisy zachowują dane lokalne); klucze AI nie są eksportowane.
 - `[x] E8.7` Usunąć z UI obietnice niemożliwe/nieudokumentowane przez API, m.in. dokładne wykorzystanie miejsca Drive i warunek „tylko przez Wi-Fi”. Przegląd kart profilu potwierdził, że UI nie deklaruje tych funkcji.
 - `[x] E8.8` Testować OAuth, uprawnienia, brak sieci, konflikt, wylogowanie/wygaśnięcie tokenu, eksport/import i ochronę klucza.
 
-**Kryterium akceptacji:** podstawowe funkcje działają bez logowania i połączenia; Drive jest repliką, nie jedynym źródłem danych; konflikty i błędy są widoczne, a klucz Gemini nigdy nie trafia do synchronizacji.
+**Kryterium akceptacji:** podstawowe funkcje działają bez logowania i połączenia; Drive jest repliką, nie jedynym źródłem danych; konflikty i błędy są widoczne, a klucze AI nigdy nie trafiają do synchronizacji.
 
 ### Etap 9 — Dostępność, zgodność i wydanie
 

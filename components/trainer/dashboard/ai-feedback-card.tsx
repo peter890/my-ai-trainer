@@ -19,7 +19,7 @@ export function AiFeedbackCard({ status, analysisText, errorText, onArchive, onR
           </div>
           <div>
             <h2 className="font-semibold">Analiza Trenera AI</h2>
-            <p className="text-xs text-muted-foreground">Gemini · indywidualna rekomendacja na kolejną sesję</p>
+            <p className="text-xs text-muted-foreground">AI · indywidualna rekomendacja na kolejną sesję</p>
           </div>
         </div>
 
@@ -51,7 +51,7 @@ export function AiFeedbackCard({ status, analysisText, errorText, onArchive, onR
         {status === 'error' && (
           <div className="flex flex-1 flex-col justify-center gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
             <p className="text-sm font-medium text-destructive">Nie udało się wygenerować analizy.</p>
-            <p className="text-sm leading-relaxed text-muted-foreground">{errorText || 'Sprawdź połączenie z siecią i klucz API Gemini, a następnie spróbuj ponownie.'}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{errorText || 'Sprawdź połączenie z siecią i klucz API wybranego dostawcy AI, a następnie spróbuj ponownie.'}</p>
             {onRetry && (
               <button
                 type="button"

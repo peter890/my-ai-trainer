@@ -1,15 +1,12 @@
-import { z } from 'zod'
+import { AI_PROVIDERS, AiProviderSchema, DEFAULT_AI_PROVIDER, type AiProvider } from './ai-provider'
+import { getAiProviderAdapter } from './ai-provider-registry'
 
-export const GEMINI_API_KEY_STORAGE_KEY = 'ai-trainer.gemini-api-key'
-export const INVALID_GEMINI_API_KEY_SNAPSHOT = '\u0000invalid-gemini-api-key'
+export { AiProviderSchema, DEFAULT_AI_PROVIDER }
+export type { AiProvider }
+export const AI_PROVIDER_STORAGE_KEY = 'ai-trainer.ai-provider'
+export const INVALID_AI_API_KEY_SNAPSHOT = '\u0000invalid-ai-api-key'
 
-const GEMINI_API_KEY_EVENT = 'ai-trainer:gemini-api-key-changed'
-
-export const GeminiApiKeySchema = z
-  .string()
-  .trim()
-  .min(1, 'Wprowadź klucz API Gemini.')
-  .max(512, 'Klucz API Gemini jest nieprawidłowy.')
+const AI_PROVIDER_EVENT = 'ai-trainer:ai-provider-changed'
 
 function getStorage(storage?: Storage): Storage {
   if (storage) return storage
@@ -19,47 +16,106 @@ function getStorage(storage?: Storage): Storage {
   return window.localStorage
 }
 
-export function getGeminiApiKey(storage?: Storage): string | undefined {
-  const value = getStorage(storage).getItem(GEMINI_API_KEY_STORAGE_KEY)
-  return value === null ? undefined : GeminiApiKeySchema.parse(value)
-}
-
-export function getGeminiApiKeySnapshot(): string {
-  try {
-    return getGeminiApiKey() ?? ''
-  } catch {
-    return INVALID_GEMINI_API_KEY_SNAPSHOT
+function getProviderSecrets(provider: AiProvider) {
+  const adapter = getAiProviderAdapter(provider)
+  return {
+    storageKey: adapter.storageKey,
+    storageEvent: adapter.storageEvent,
+    apiKeySchema: adapter.apiKeySchema,
   }
 }
 
-export function subscribeToGeminiApiKey(onChange: () => void): () => void {
+export function getAiProvider(storage?: Storage): AiProvider {
+  const value = getStorage(storage).getItem(AI_PROVIDER_STORAGE_KEY)
+  return value === null ? DEFAULT_AI_PROVIDER : AiProviderSchema.parse(value)
+}
+
+export function getAiProviderSnapshot(): AiProvider {
+  try {
+    return getAiProvider()
+  } catch {
+    return DEFAULT_AI_PROVIDER
+  }
+}
+
+export function subscribeToAiProvider(onChange: () => void): () => void {
   if (typeof window === 'undefined') return () => {}
 
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === null || event.key === GEMINI_API_KEY_STORAGE_KEY) onChange()
+    if (event.key === null || event.key === AI_PROVIDER_STORAGE_KEY) onChange()
   }
   const handleLocalChange = () => onChange()
 
   window.addEventListener('storage', handleStorage)
-  window.addEventListener(GEMINI_API_KEY_EVENT, handleLocalChange)
+  window.addEventListener(AI_PROVIDER_EVENT, handleLocalChange)
   return () => {
     window.removeEventListener('storage', handleStorage)
-    window.removeEventListener(GEMINI_API_KEY_EVENT, handleLocalChange)
+    window.removeEventListener(AI_PROVIDER_EVENT, handleLocalChange)
   }
 }
 
-export function saveGeminiApiKey(value: unknown, storage?: Storage): string {
-  const apiKey = GeminiApiKeySchema.parse(value)
-  getStorage(storage).setItem(GEMINI_API_KEY_STORAGE_KEY, apiKey)
+export function saveAiProvider(value: unknown, storage?: Storage): AiProvider {
+  const provider = AiProviderSchema.parse(value)
+  getStorage(storage).setItem(AI_PROVIDER_STORAGE_KEY, provider)
   if (!storage && typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(GEMINI_API_KEY_EVENT))
+    window.dispatchEvent(new Event(AI_PROVIDER_EVENT))
+  }
+  return provider
+}
+
+export function getAiApiKey(provider: AiProvider, storage?: Storage): string | undefined {
+  const { storageKey } = getProviderSecrets(provider)
+  const value = getStorage(storage).getItem(storageKey)
+  return value === null ? undefined : parseAiApiKey(provider, value)
+}
+
+export function parseAiApiKey(provider: AiProvider, value: unknown): string {
+  return getProviderSecrets(provider).apiKeySchema.parse(value)
+}
+
+export function getAiApiKeySnapshot(provider: AiProvider): string {
+  try {
+    return getAiApiKey(provider) ?? ''
+  } catch {
+    return INVALID_AI_API_KEY_SNAPSHOT
+  }
+}
+
+export function subscribeToAiApiKey(provider: AiProvider, onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+
+  const { storageKey, storageEvent: eventName } = getProviderSecrets(provider)
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === storageKey) onChange()
+  }
+  const handleLocalChange = () => onChange()
+
+  window.addEventListener('storage', handleStorage)
+  window.addEventListener(eventName, handleLocalChange)
+  return () => {
+    window.removeEventListener('storage', handleStorage)
+    window.removeEventListener(eventName, handleLocalChange)
+  }
+}
+
+export function saveAiApiKey(provider: AiProvider, value: unknown, storage?: Storage): string {
+  const { storageKey, storageEvent } = getProviderSecrets(provider)
+  const apiKey = parseAiApiKey(provider, value)
+  getStorage(storage).setItem(storageKey, apiKey)
+  if (!storage && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(storageEvent))
   }
   return apiKey
 }
 
-export function removeGeminiApiKey(storage?: Storage): void {
-  getStorage(storage).removeItem(GEMINI_API_KEY_STORAGE_KEY)
+export function removeAiApiKey(provider: AiProvider, storage?: Storage): void {
+  const { storageKey, storageEvent } = getProviderSecrets(provider)
+  getStorage(storage).removeItem(storageKey)
   if (!storage && typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(GEMINI_API_KEY_EVENT))
+    window.dispatchEvent(new Event(storageEvent))
   }
+}
+
+export function removeAllAiApiKeys(storage?: Storage): void {
+  for (const provider of AI_PROVIDERS) removeAiApiKey(provider, storage)
 }

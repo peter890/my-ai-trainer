@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { filterExercisesForPlan } from '@/lib/exercise-catalog'
-import { generateWorkoutPlanWithGemini } from '@/lib/gemini'
+import { generateWorkoutPlan } from '@/lib/ai'
 import { createWorkoutPlan } from '@/lib/plan-builder'
 import { getProfile, savePlans } from '@/lib/repositories'
+import { getAiApiKey, getAiProvider } from '@/lib/local-secrets'
 import type { Exercise } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 import { SavedPlans } from './saved-plans'
@@ -18,14 +19,14 @@ const levels = ['Początkujący', 'Średni', 'Zaawansowany'] as const
 const dayOptions = [2, 3, 4, 5, 6]
 const lengthOptions = [45, 60, 75, 90]
 
-const goalToGeminiGoal = {
+const goalToAiGoal = {
   Hipertrofia: 'hypertrophy',
   Siła: 'strength',
   Redukcja: 'weight_loss',
   Kondycja: 'endurance',
 } as const
 
-const levelToGeminiLevel = {
+const levelToAiLevel = {
   Początkujący: 'beginner',
   Średni: 'intermediate',
   Zaawansowany: 'advanced',
@@ -63,15 +64,25 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
     const profile = await getProfile().catch(() => undefined)
 
     try {
-      const generated = await generateWorkoutPlanWithGemini({
-        goal: goalToGeminiGoal[goal],
-        level: levelToGeminiLevel[level],
-        days_per_week: days,
-        session_minutes: length,
-        profile,
-        prefer_favorites: preferFavorites,
-        exercises: pool,
-      })
+      const provider = getAiProvider()
+      const apiKey = getAiApiKey(provider)
+      if (!apiKey) {
+        throw new Error('Brakuje klucza API wybranego dostawcy AI. Dodaj go w profilu, aby wygenerować plan.')
+      }
+
+      const generated = await generateWorkoutPlan(
+        {
+          goal: goalToAiGoal[goal],
+          level: levelToAiLevel[level],
+          days_per_week: days,
+          session_minutes: length,
+          profile,
+          prefer_favorites: preferFavorites,
+          exercises: pool,
+        },
+        provider,
+        apiKey,
+      )
 
       const byId = new Map(pool.map((exercise) => [exercise.id, exercise] as const))
       const nextPlan: PlanDay[] = generated.days.map((day) => ({
@@ -86,7 +97,7 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
       }))
 
       if (nextPlan.some((day) => day.exercises.length === 0)) {
-        throw new Error('Gemini zwróciło niekompletny plan. Spróbuj ponownie.')
+        throw new Error('AI zwróciło niekompletny plan. Spróbuj ponownie.')
       }
 
       setPlan(nextPlan)

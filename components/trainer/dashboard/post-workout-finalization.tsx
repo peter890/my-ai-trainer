@@ -15,9 +15,9 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { generateWorkoutAnalysis } from '@/lib/gemini'
+import { generateWorkoutAnalysis } from '@/lib/ai'
 import { numberFormat } from '@/lib/format'
-import { getGeminiApiKey } from '@/lib/local-secrets'
+import { getAiApiKey, getAiProvider } from '@/lib/local-secrets'
 import { getProfile, getWorkouts, saveWorkout } from '@/lib/repositories'
 import type { Workout, WorkoutInput } from '@/lib/schemas'
 import { createWorkoutSurveyUpdate, getPendingFinalizationWorkouts } from '@/lib/post-workout'
@@ -58,7 +58,7 @@ function getWorkoutSummary(workout: Workout) {
 export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => void }) {
   const [energy, setEnergy] = useState(3)
   const [notes, setNotes] = useState('')
-  const [consentToGemini, setConsentToGemini] = useState(false)
+  const [consentToAi, setConsentToAi] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [analysisText, setAnalysisText] = useState('')
   const [error, setError] = useState('')
@@ -117,7 +117,7 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
   }
 
   const finalize = async () => {
-    if (!workout || !consentToGemini) return
+    if (!workout || !consentToAi) return
 
     setStatus('loading')
     setError('')
@@ -125,9 +125,10 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
     try {
       const surveyWorkout = await saveSurvey()
       if (!surveyWorkout) return
-      const apiKey = getGeminiApiKey()
+      const provider = getAiProvider()
+      const apiKey = getAiApiKey(provider)
       if (!apiKey) {
-        throw new Error('Brakuje klucza API Gemini. Dodaj go w profilu, aby wygenerować analizę.')
+        throw new Error('Brakuje klucza API wybranego dostawcy AI. Dodaj go w profilu, aby wygenerować analizę.')
       }
 
       const [profile, recentWorkouts] = await Promise.all([
@@ -140,7 +141,13 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
         ),
       ])
 
-      const analysis = await generateWorkoutAnalysis(surveyWorkout, profile, recentWorkouts, apiKey)
+      const analysis = await generateWorkoutAnalysis(
+        surveyWorkout,
+        profile,
+        recentWorkouts,
+        provider,
+        apiKey,
+      )
       const finalizedWorkout: WorkoutInput = {
         ...surveyWorkout,
         status: 'completed',
@@ -192,7 +199,7 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
 
     setEnergy(remaining[0]?.readiness_energy_score ?? 3)
     setNotes(remaining[0]?.post_workout_user_notes ?? '')
-    setConsentToGemini(false)
+    setConsentToAi(false)
     setStatus('idle')
     setAnalysisText('')
     setError('')
@@ -289,19 +296,19 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
           ) : null}
 
           <label
-            htmlFor="gemini-consent"
+            htmlFor="ai-consent"
             className="flex items-start gap-3 rounded-xl border border-border bg-secondary/30 p-3 text-sm"
           >
             <input
-              id="gemini-consent"
+              id="ai-consent"
               type="checkbox"
-              checked={consentToGemini}
-              onChange={(event) => setConsentToGemini(event.target.checked)}
+              checked={consentToAi}
+              onChange={(event) => setConsentToAi(event.target.checked)}
               disabled={status === 'loading' || status === 'saving' || status === 'done' || status === 'saved'}
               className="mt-0.5 size-4 shrink-0 accent-primary"
             />
             <span className="text-muted-foreground">
-              Zgadzam się wysłać do Google Gemini dane tej sesji (plan, ćwiczenia, serie i czas), ankietę energii i
+              Zgadzam się wysłać do wybranego dostawcy AI dane tej sesji (plan, ćwiczenia, serie i czas), ankietę energii i
               notatki, dane profilu (płeć, wiek, wzrost, aktualna waga, cel, poziom i wykluczone ćwiczenia) oraz
               podsumowania maksymalnie 3 ostatnich treningów. Klucz API jest przechowywany lokalnie, używany wyłącznie do
               tego żądania i nie trafia do historii ani synchronizacji Drive.
@@ -312,7 +319,7 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
             type="button"
             onClick={() => void finalize()}
             disabled={
-              !consentToGemini ||
+              !consentToAi ||
               status === 'loading' ||
               status === 'saving' ||
               status === 'done' ||
@@ -323,7 +330,7 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
             {status === 'loading' ? (
               <>
                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                Gemini analizuje trening…
+                AI analizuje trening…
               </>
             ) : status === 'saving' ? (
               <>
