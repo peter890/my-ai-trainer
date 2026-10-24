@@ -10,7 +10,7 @@ const GeminiTextResponseSchema = z.object({
     .array(
       z.object({
         content: z.object({
-          parts: z.array(z.object({ text: z.string().optional() })),
+          parts: z.array(z.object({ text: z.string().optional() })).optional(),
         }),
       }),
     )
@@ -74,7 +74,7 @@ async function requestGemini(
 function extractTextFromResponse(payload: unknown): string {
   const result = GeminiTextResponseSchema.parse(payload)
   const textParts = result.candidates.flatMap((candidate) =>
-    candidate.content.parts.map((part) => part.text ?? '').filter(Boolean),
+    (candidate.content.parts ?? []).map((part) => part.text ?? '').filter(Boolean),
   )
 
   return textParts.join('\n').trim()
@@ -104,7 +104,7 @@ export async function testGeminiConnection(apiKey: unknown, fetcher: Fetcher = f
   const validApiKey = GeminiApiKeySchema.parse(apiKey)
   const response = await requestGemini(fetcher, validApiKey, {
     contents: [{ parts: [{ text: 'Odpowiedz jednym słowem: OK.' }] }],
-    generationConfig: { maxOutputTokens: 8, temperature: 0 },
+    generationConfig: { maxOutputTokens: 32, temperature: 0 },
   })
 
   const text = extractTextFromResponse(await response.json())

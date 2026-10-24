@@ -19,6 +19,9 @@ describe('testGeminiConnection', () => {
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     )
     expect(new Headers(request.headers as HeadersInit).get('x-goog-api-key')).toBe('api-key')
+    expect(JSON.parse(request.body as string)).toMatchObject({
+      generationConfig: { maxOutputTokens: 32, temperature: 0 },
+    })
   })
 
   it('reports an HTTP error without logging request credentials', async () => {
@@ -44,6 +47,16 @@ describe('testGeminiConnection', () => {
 
     await expect(testGeminiConnection('api-key', fetcher)).rejects.toThrow(
       'Model Gemini jest chwilowo przeciążony.',
+    )
+  })
+
+  it('reports an empty model response without exposing a schema error', async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(JSON.stringify({ candidates: [{ content: {} }] }), { status: 200 }),
+    )
+
+    await expect(testGeminiConnection('api-key', fetcher)).rejects.toThrow(
+      'Gemini nie zwróciło tekstowej odpowiedzi testowej.',
     )
   })
 })
