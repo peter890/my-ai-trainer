@@ -5,6 +5,7 @@ import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Trash2 } from 'lucide-rea
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { testAiConnection } from '@/lib/ai'
 import {
   getAiApiKeySnapshot,
@@ -111,15 +112,15 @@ export function AiProviderCard() {
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor="ai-provider">Usługa AI</Label>
-          <select
-            id="ai-provider"
-            value={provider}
-            onChange={(event) => changeProvider(event.target.value as AiProvider)}
-            className="h-11 rounded-lg border border-input bg-secondary/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <option value="gemini">Google Gemini</option>
-            <option value="openrouter">OpenRouter</option>
-          </select>
+          <Select value={provider} onValueChange={(value) => changeProvider(value as AiProvider)}>
+            <SelectTrigger id="ai-provider" className="h-11 w-full bg-secondary/30">
+              <SelectValue>{providerLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectItem value="gemini">Google Gemini</SelectItem>
+              <SelectItem value="openrouter">OpenRouter</SelectItem>
+            </SelectContent>
+          </Select>
           <Label htmlFor="ai-key">Klucz API {providerLabel}</Label>
           <div className="relative">
             <Input

@@ -8,7 +8,7 @@ describe('createWorkoutPlan', () => {
         {
           name: 'Pull A',
           exercises: [
-            { id: 'lat-pulldown', restType: 'moderate_compound', scheme: '3 × 8–12' },
+            { id: 'lat-pulldown', restType: 'moderate_compound', scheme: '3 x 8-12' },
             { id: 'face-pull', restType: 'isolation', scheme: '3 × 8–12' },
           ],
         },

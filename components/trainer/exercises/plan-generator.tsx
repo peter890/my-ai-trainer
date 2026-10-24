@@ -34,7 +34,11 @@ const levelToAiLevel = {
 
 type PlanDay = { name: string; exercises: (Exercise & { scheme: string })[] }
 
-export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
+export function PlanGenerator({
+  exercises,
+}: {
+  exercises: Exercise[]
+}) {
   const [goal, setGoal] = useState<(typeof goals)[number]>('Hipertrofia')
   const [level, setLevel] = useState<(typeof levels)[number]>('Średni')
   const [days, setDays] = useState(4)
@@ -146,7 +150,7 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-6">
-      <Card className="lg:sticky lg:top-6">
+      <Card>
         <CardHeader>
           <CardTitle className="font-semibold">Parametry planu</CardTitle>
           <CardDescription>Dobór ćwiczeń uwzględnia cel, czas oraz ulubione i wykluczone pozycje.</CardDescription>
@@ -273,11 +277,13 @@ export function PlanGenerator({ exercises }: { exercises: Exercise[] }) {
               Zapisz plan tygodniowy
             </button>
             {message ? <p role="status" className="text-sm text-emerald-300">{message}</p> : null}
-            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           </div>
         ) : null}
+        {error ? <p role="alert" className="mt-4 text-sm text-destructive">{error}</p> : null}
       </section>
-      <SavedPlans exercises={exercises} refreshKey={plansRevision} />
+      <div className="lg:col-span-2">
+        <SavedPlans exercises={exercises} refreshKey={plansRevision} />
+      </div>
     </div>
   )
 }

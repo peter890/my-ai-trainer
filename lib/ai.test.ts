@@ -24,7 +24,7 @@ describe('testAiConnection', () => {
     )
     expect(new Headers(request.headers as HeadersInit).get('x-goog-api-key')).toBe('api-key')
     expect(JSON.parse(request.body as string)).toMatchObject({
-      generationConfig: { maxOutputTokens: 32, temperature: 0 },
+      generationConfig: { maxOutputTokens: 128, temperature: 0 },
     })
   })
 
@@ -77,9 +77,20 @@ describe('testAiConnection', () => {
     expect(JSON.parse(request.body as string)).toMatchObject({
       model: OPENROUTER_MODEL,
       messages: [{ role: 'user', content: 'Odpowiedz jednym słowem: OK.' }],
-      max_tokens: 32,
+      max_tokens: 128,
       temperature: 0,
+      reasoning: { max_tokens: 32 },
     })
+  })
+
+  it('reports an empty OpenRouter content response without a schema error', async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: null } }] }), { status: 200 }),
+    )
+
+    await expect(testAiConnection('openrouter', 'openrouter-key', fetcher)).rejects.toThrow(
+      'Dostawca AI nie zwrócił tekstowej odpowiedzi testowej.',
+    )
   })
 })
 

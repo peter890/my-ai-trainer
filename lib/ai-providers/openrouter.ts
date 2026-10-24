@@ -39,6 +39,15 @@ export const openRouterAdapter: AiProviderAdapter = {
           messages: [{ role: 'user', content: request.prompt }],
           max_tokens: request.maxOutputTokens,
           temperature: request.temperature,
+          ...(request.reasoningMaxTokens !== undefined || request.reasoningEffort
+            ? {
+                reasoning: {
+                  ...(request.reasoningMaxTokens !== undefined
+                    ? { max_tokens: request.reasoningMaxTokens }
+                    : { effort: request.reasoningEffort }),
+                },
+              }
+            : {}),
           ...(request.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
         }),
       })

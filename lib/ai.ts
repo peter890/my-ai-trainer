@@ -75,8 +75,10 @@ export async function testAiConnection(
     validApiKey,
     {
       prompt: 'Odpowiedz jednym słowem: OK.',
-      maxOutputTokens: 32,
+      maxOutputTokens: 128,
       temperature: 0,
+      reasoningEffort: 'minimal',
+      reasoningMaxTokens: 32,
     },
     fetcher,
   )
@@ -150,7 +152,7 @@ ZADANIE
   const text = await requestText(
     validProvider,
     validApiKey,
-    { prompt, maxOutputTokens: 512, temperature: 0.4 },
+    { prompt, maxOutputTokens: 512, temperature: 0.4, reasoningEffort: 'minimal', reasoningMaxTokens: 128 },
     fetcher,
   )
   if (!text) throw new Error('AI nie zwróciło treści analizy treningu.')
@@ -218,6 +220,7 @@ Wymagania:
 - wybieraj tylko exercise_id z listy available_exercises,
 - każde ćwiczenie w danym dniu może wystąpić tylko raz,
 - zakres scheme dopasuj do celu i poziomu,
+- nazwy dni zapisuj wyłącznie po polsku, np. "Góra A", "Dół A", "Góra B", "Dół B"; nie używaj nazw "Push", "Pull" ani "Legs",
 - uwzględnij profil użytkownika, jeśli podano,
 - jeśli prefer_favorites = true, preferuj ćwiczenia oznaczone jako favorite.
 
@@ -254,7 +257,14 @@ ${JSON.stringify(
   const text = await requestText(
     validProvider,
     validApiKey,
-    { prompt, maxOutputTokens: 1024, temperature: 0.3, responseFormat: 'json' },
+    {
+      prompt,
+      maxOutputTokens: 2048,
+      temperature: 0.3,
+      responseFormat: 'json',
+      reasoningEffort: 'minimal',
+      reasoningMaxTokens: 256,
+    },
     fetcher,
   )
   if (!text) throw new Error('AI nie zwróciło treści planu treningowego.')

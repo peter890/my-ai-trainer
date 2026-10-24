@@ -12,6 +12,8 @@ export type AiTextRequest = {
   maxOutputTokens: number
   temperature: number
   responseFormat?: 'json'
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high'
+  reasoningMaxTokens?: number
 }
 
 export class AiProviderRequestError extends Error {

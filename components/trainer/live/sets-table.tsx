@@ -3,6 +3,7 @@
 import { useId, useState } from 'react'
 import { Check, Minus, Pencil, Plus, Trash2, Wand2, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { validateSetDraft, type SetDraft } from '@/lib/live-session'
 import type { LoggedSet } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
@@ -116,18 +117,26 @@ export function SetsTable({
                     }
                     className="h-9 min-w-0 rounded-md border border-input bg-background px-1 font-mono text-sm"
                   />
-                  <select
-                    aria-label={`RIR serii ${i + 1}`}
-                    value={editingDraft.rir}
-                    onChange={(event) =>
-                      setEditingDraft({ ...editingDraft, rir: Number(event.target.value) })
+                  <Select
+                    value={String(editingDraft.rir)}
+                    onValueChange={(value) =>
+                      setEditingDraft({ ...editingDraft, rir: Number(value) })
                     }
-                    className="h-9 min-w-0 rounded-md border border-input bg-background px-1 text-xs"
                   >
-                    {rirOptions.map((rir) => (
-                      <option key={rir} value={rir}>{rir === 4 ? '4+' : rir}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      aria-label={`RIR serii ${i + 1}`}
+                      className="h-9 min-w-0 w-full bg-background px-1 text-xs"
+                    >
+                      <SelectValue>{editingDraft.rir === 4 ? '4+' : editingDraft.rir}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      {rirOptions.map((rir) => (
+                        <SelectItem key={rir} value={String(rir)}>
+                          {rir === 4 ? '4+' : rir}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <span className="flex items-center gap-0.5">
                     <button
                       type="button"

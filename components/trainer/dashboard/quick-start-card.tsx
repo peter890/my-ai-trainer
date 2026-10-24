@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Clock, Dumbbell, Play, Sparkles } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getExercises, getPlans } from '@/lib/repositories'
 import type { WorkoutPlan } from '@/lib/schemas'
 import type { Exercise as ExerciseRecord } from '@/lib/schemas'
@@ -98,17 +99,23 @@ export function QuickStartCard({
           {plans.length > 1 ? (
             <label className="flex flex-col gap-2 text-sm">
               Wybierz zapisany plan
-              <select
+              <Select
                 value={selectedPlanId}
-                onChange={(event) => setSelectedPlanId(event.target.value)}
-                className="h-11 rounded-md border border-input bg-background px-3 text-foreground"
+                onValueChange={(value) => {
+                  if (value) setSelectedPlanId(value)
+                }}
               >
-                {plans.map((plan) => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-11 w-full bg-background">
+                  <SelectValue>{selectedPlan?.name}</SelectValue>
+                </SelectTrigger>
+                <SelectContent align="start">
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>
+                      {plan.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           ) : null}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">

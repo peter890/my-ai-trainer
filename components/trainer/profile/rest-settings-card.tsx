@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ProfileDocument } from '@/lib/schemas'
 
 type RestTimerDefaults = ProfileDocument['settings']['rest_timer_defaults']
@@ -47,19 +48,22 @@ export function RestSettingsCard({
         ))}
         <div className="flex flex-col gap-2 sm:col-span-3">
           <Label htmlFor="rest-timer-signal">Sygnał końca przerwy</Label>
-          <select
-            id="rest-timer-signal"
+          <Select
             value={signal}
-            onChange={(event) => {
-              if (event.target.value === 'none' || event.target.value === 'vibrate') {
-                onSignalChange(event.target.value)
-              }
+            onValueChange={(value) => {
+              if (value === 'none' || value === 'vibrate') onSignalChange(value)
             }}
-            className="h-11 rounded-md border border-input bg-background px-3 text-sm text-foreground"
           >
-            <option value="vibrate">Wibracja, jeśli jest obsługiwana</option>
-            <option value="none">Bez sygnału</option>
-          </select>
+            <SelectTrigger id="rest-timer-signal" className="h-11 w-full bg-background">
+              <SelectValue>
+                {signal === 'vibrate' ? 'Wibracja, jeśli jest obsługiwana' : 'Bez sygnału'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectItem value="vibrate">Wibracja, jeśli jest obsługiwana</SelectItem>
+              <SelectItem value="none">Bez sygnału</SelectItem>
+            </SelectContent>
+          </Select>
           <p className="text-xs text-muted-foreground">
             Sygnał jest wyłączony, gdy przeglądarka lub urządzenie nie obsługuje wibracji.
           </p>

@@ -27,7 +27,7 @@ export function createWorkoutPlan(
     name: day.name,
     type: getWorkoutType(day.name),
     exercises: day.exercises.map((exercise, order) => {
-      const [setsPart, repsPart] = exercise.scheme.split('×').map((part) => part.trim())
+      const [setsPart, repsPart] = exercise.scheme.split(/\s*[x×]\s*/i).map((part) => part.trim())
       const targetSets = Number.parseInt(setsPart?.match(/\d+/)?.[0] ?? '', 10)
       const targetReps = repsPart?.replace(/[–—]/g, '-').replace(/[^\d-]/g, '') ?? ''
       return {

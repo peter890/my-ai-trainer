@@ -1,0 +1,146 @@
+[
+  {
+    "id": "bench-press",
+    "name": "Wyciskanie sztangi leżąc",
+    "category": "chest",
+    "equipment": "barbell",
+    "rest_type": "heavy_compound",
+    "technique_note": "Ściągnij łopatki, oprzyj stopy na podłodze i opuszczaj sztangę pod kontrolą."
+  },
+  {
+    "id": "incline-dumbbell-press",
+    "name": "Wyciskanie hantli na skosie",
+    "category": "chest",
+    "equipment": "dumbbell",
+    "rest_type": "moderate_compound",
+    "technique_note": "Prowadź hantle stabilnie i nie blokuj gwałtownie łokci."
+  },
+  {
+    "id": "cable-fly",
+    "name": "Rozpiętki na bramie",
+    "category": "chest",
+    "equipment": "cable",
+    "rest_type": "isolation",
+    "technique_note": "Utrzymuj lekko ugięte łokcie i kontroluj rozciągnięcie klatki."
+  },
+  {
+    "id": "dip",
+    "name": "Pompki na poręczach",
+    "category": "chest",
+    "equipment": "calisthenics",
+    "rest_type": "moderate_compound",
+    "technique_note": "Zejdź tylko tak nisko, jak pozwala bezbolesny zakres ruchu."
+  },
+  {
+    "id": "pull-up",
+    "name": "Podciąganie nachwytem",
+    "category": "back",
+    "equipment": "calisthenics",
+    "rest_type": "moderate_compound",
+    "technique_note": "Rozpocznij ruch od ściągnięcia łopatek i unikaj bujania."
+  },
+  {
+    "id": "barbell-row",
+    "name": "Wiosłowanie sztangą",
+    "category": "back",
+    "equipment": "barbell",
+    "rest_type": "heavy_compound",
+    "technique_note": "Utrzymuj neutralne plecy i przyciągaj sztangę do dolnej części brzucha."
+  },
+  {
+    "id": "lat-pulldown",
+    "name": "Ściąganie drążka wąsko",
+    "category": "back",
+    "equipment": "cable",
+    "rest_type": "moderate_compound",
+    "technique_note": "Ściągaj drążek do górnej części klatki bez odchylania tułowia."
+  },
+  {
+    "id": "overhead-press",
+    "name": "Wyciskanie żołnierskie",
+    "category": "shoulders",
+    "equipment": "barbell",
+    "rest_type": "heavy_compound",
+    "technique_note": "Napnij brzuch i pośladki, prowadząc sztangę pionowo nad głowę."
+  },
+  {
+    "id": "cable-lateral-raise",
+    "name": "Wznosy bokiem na wyciągu",
+    "category": "shoulders",
+    "equipment": "cable",
+    "rest_type": "isolation",
+    "technique_note": "Unosząc ramię, utrzymuj kontrolę i nie szarp ciężarem."
+  },
+  {
+    "id": "face-pull",
+    "name": "Face pull",
+    "category": "shoulders",
+    "equipment": "cable",
+    "rest_type": "isolation",
+    "technique_note": "Przyciągaj linę w kierunku twarzy, rotując dłonie na zewnątrz."
+  },
+  {
+    "id": "barbell-squat",
+    "name": "Przysiad ze sztangą",
+    "category": "legs",
+    "equipment": "barbell",
+    "rest_type": "heavy_compound",
+    "technique_note": "Utrzymuj stabilny tułów i kolana w kierunku palców stóp."
+  },
+  {
+    "id": "romanian-deadlift",
+    "name": "Martwy ciąg rumuński",
+    "category": "legs",
+    "equipment": "barbell",
+    "rest_type": "heavy_compound",
+    "technique_note": "Cofaj biodra przy neutralnych plecach, aż poczujesz pracę tyłu uda."
+  },
+  {
+    "id": "leg-press",
+    "name": "Wypychanie na suwnicy",
+    "category": "legs",
+    "equipment": "machine",
+    "rest_type": "moderate_compound",
+    "technique_note": "Nie odrywaj bioder od oparcia i nie blokuj kolan w górnej fazie."
+  },
+  {
+    "id": "bulgarian-split-squat",
+    "name": "Wykroki bułgarskie",
+    "category": "legs",
+    "equipment": "dumbbell",
+    "rest_type": "moderate_compound",
+    "technique_note": "Utrzymuj stabilną pozycję i kontroluj zejście przedniej nogi."
+  },
+  {
+    "id": "dumbbell-curl",
+    "name": "Uginanie z hantlami",
+    "category": "arms",
+    "equipment": "dumbbell",
+    "rest_type": "isolation",
+    "technique_note": "Trzymaj łokcie blisko tułowia i nie wykorzystuj zamachu."
+  },
+  {
+    "id": "cable-triceps-extension",
+    "name": "Prostowanie ramion na wyciągu",
+    "category": "arms",
+    "equipment": "cable",
+    "rest_type": "isolation",
+    "technique_note": "Utrzymuj łokcie nieruchomo przy tułowiu i kontroluj powrót."
+  },
+  {
+    "id": "plank",
+    "name": "Plank",
+    "category": "abs",
+    "equipment": "calisthenics",
+    "rest_type": "isolation",
+    "technique_note": "Utrzymuj ciało w jednej linii i napnij brzuch oraz pośladki."
+  },
+  {
+    "id": "cable-crunch",
+    "name": "Spięcia brzucha na wyciągu",
+    "category": "abs",
+    "equipment": "cable",
+    "rest_type": "isolation",
+    "technique_note": "Zwijaj tułów przez pracę mięśni brzucha, bez ciągnięcia rękami."
+  }
+]

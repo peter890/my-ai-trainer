@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getPlans, savePlan, deletePlan } from '@/lib/repositories'
 import { WorkoutPlanSchema, type WorkoutPlan } from '@/lib/schemas'
 import type { Exercise } from '@/lib/trainer-data'
@@ -150,11 +151,10 @@ export function SavedPlans({
                       <label className="sr-only" htmlFor={`${plan.id}-exercise-${index}`}>
                         Ćwiczenie {index + 1} w planie {plan.name}
                       </label>
-                      <select
-                        id={`${plan.id}-exercise-${index}`}
+                      <Select
                         value={planExercise.exercise_id}
-                        onChange={(event) => {
-                          const selected = activeExercises.find(({ id }) => id === event.target.value)
+                        onValueChange={(value) => {
+                          const selected = activeExercises.find(({ id }) => id === value)
                           if (!selected) return
                           updatePlan(plan.id, (current) => ({
                             ...current,
@@ -165,14 +165,21 @@ export function SavedPlans({
                             ),
                           }))
                         }}
-                        className="h-10 min-w-0 rounded-md border border-input bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        {options.map((exercise) => (
-                          <option key={exercise.id} value={exercise.id}>
-                            {exercise.name}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger
+                          id={`${plan.id}-exercise-${index}`}
+                          className="h-10 w-full min-w-0 bg-background px-2 text-sm"
+                        >
+                          <SelectValue>{currentExercise?.name ?? 'Wybierz ćwiczenie'}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          {options.map((exercise) => (
+                            <SelectItem key={exercise.id} value={exercise.id}>
+                              {exercise.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Input
                         type="number"
                         min={1}

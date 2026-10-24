@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import type { ExperienceLevel, Gender, PrimaryGoal } from '@/lib/schemas'
 import { cn } from '@/lib/utils'
@@ -162,21 +163,24 @@ function SelectField<T extends string>({
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <select
-        id={id}
+      <Select
         value={value}
-        onChange={(event) => {
-          const option = options.find((candidate) => candidate.value === event.target.value)
+        onValueChange={(nextValue) => {
+          const option = options.find((candidate) => candidate.value === nextValue)
           if (option) onChange(option.value)
         }}
-        className="h-11 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id={id} className="h-11 w-full bg-background">
+          <SelectValue>{options.find((option) => option.value === value)?.label}</SelectValue>
+        </SelectTrigger>
+        <SelectContent align="start">
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }
