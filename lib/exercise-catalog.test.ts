@@ -26,7 +26,7 @@ describe('exercise catalog', () => {
     databases.push(database)
 
     const initial = await initializeExerciseCatalog(database)
-    expect(initial.exercises).toHaveLength(18)
+    expect(initial.exercises).toHaveLength(19)
     expect(initial.exercises.every((exercise) => exercise.active)).toBe(true)
     expect(initial.preferences).toMatchObject({
       excluded_exercise_ids: [],
@@ -43,7 +43,7 @@ describe('exercise catalog', () => {
     const benchPress = reopened.exercises.filter((exercise) => exercise.id === 'bench-press')
     expect(benchPress).toHaveLength(1)
     expect(benchPress[0] && toExerciseView(benchPress[0], reopened.preferences).favorite).toBe(true)
-    expect(reopened.exercises).toHaveLength(18)
+    expect(reopened.exercises).toHaveLength(19)
   })
 
   it('maps Polish form values to validated catalog data', () => {

@@ -10,7 +10,7 @@ import type { ExerciseDraft, EquipmentLabel } from '@/lib/exercise-catalog'
 import { muscleGroups, type MuscleGroup } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
-const equipmentOptions: EquipmentLabel[] = ['Sztanga', 'Hantle', 'Wyciąg', 'Maszyna', 'Kalistenika', 'Kardio']
+const equipmentOptions: EquipmentLabel[] = ['Sztanga', 'Hantle', 'Wyciąg', 'Maszyna', 'Kalistenika', 'Kardio', 'Bieżnia']
 const restOptions: { value: RestType; label: string }[] = [
   { value: 'heavy_compound', label: 'Ciężkie' },
   { value: 'moderate_compound', label: 'Złożone' },

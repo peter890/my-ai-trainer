@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { getExerciseAlternatives, toExerciseView } from './exercise-catalog'
-import type { Exercise, ProfileDocument, RestType, Workout, WorkoutPlan } from './schemas'
+import type { CardioMetrics, Exercise, ProfileDocument, RestType, Workout, WorkoutPlan } from './schemas'
 import type { ExercisePreferences } from './schemas'
 import { WorkoutSchema } from './schemas'
 import type { LoggedSet } from './trainer-data'
@@ -12,6 +12,7 @@ export type SessionAlternative = {
   restSeconds: number
   suggested: { weight: number; reps: number }
   lastTime: string
+  isCardio: boolean
 }
 
 export type SessionExercise = {
@@ -27,6 +28,8 @@ export type SessionExercise = {
   restSeconds: number
   suggested: { weight: number; reps: number }
   completedSets: LoggedSet[]
+  completedCardio?: CardioMetrics
+  isCardio: boolean
 }
 
 const restSecondsByType: Record<RestType, number> = {
@@ -217,6 +220,7 @@ export function buildSessionExercises(
         restSeconds: getRestSeconds(alternative, restTimerDefaults),
         suggested: alternativePerformance.suggested,
         lastTime: alternativePerformance.lastTime,
+        isCardio: alternative.category === 'cardio' || alternative.rest_type === 'cardio',
       }
     })
 
@@ -228,11 +232,13 @@ export function buildSessionExercises(
       note: exercise?.technique_note ?? 'Brak notatki technicznej; uzupełnij opis ćwiczenia.',
       workoutNote: currentExercise?.note_during_workout ?? '',
       lastTime: performance.lastTime,
-      targetSets: planExercise.target_sets,
+      targetSets: exercise.category === 'cardio' || exercise.rest_type === 'cardio' ? 1 : planExercise.target_sets,
       targetReps: planExercise.target_reps,
       restSeconds: getRestSeconds(exercise, restTimerDefaults),
       suggested: { weight: performance.suggested.weight, reps: suggestedReps },
       completedSets: performance.currentSets,
+      completedCardio: currentExercise?.cardio,
+      isCardio: exercise.category === 'cardio' || exercise.rest_type === 'cardio',
     }
   })
 }

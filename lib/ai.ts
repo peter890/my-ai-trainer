@@ -9,6 +9,7 @@ import {
 import { getAiApiKey, parseAiApiKey } from './local-secrets'
 import { AiAnalysisFeedbackSchema, GeneratedWorkoutPlanSchema } from './schemas'
 import type { ProfileDocument, Workout } from './schemas'
+import { getCardioSummary } from './cardio'
 import type { Exercise as ExerciseView } from './trainer-data'
 
 const GeminiAnalysisSchema = z.object({
@@ -133,6 +134,7 @@ export async function generateWorkoutAnalysis(
           reps: set.reps,
           rir: set.rir ?? 2,
         })),
+        cardio: exercise.cardio ? getCardioSummary(exercise.cardio, profile?.profile.weight_history.at(-1)?.weight_kg) : undefined,
       })),
       post_workout_user_notes: workout.post_workout_user_notes ?? '',
     },

@@ -142,5 +142,13 @@
     "equipment": "cable",
     "rest_type": "isolation",
     "technique_note": "Zwijaj tułów przez pracę mięśni brzucha, bez ciągnięcia rękami."
+  },
+  {
+    "id": "treadmill",
+    "name": "Bieżnia",
+    "category": "cardio",
+    "equipment": "treadmill",
+    "rest_type": "cardio",
+    "technique_note": "Dobierz prędkość i nachylenie do programu oraz aktualnej intensywności treningu."
   }
 ]

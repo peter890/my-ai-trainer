@@ -20,6 +20,7 @@ const equipmentOptions: Exercise['equipment'][] = [
   'Maszyna',
   'Kalistenika',
   'Kardio',
+  'Bieżnia',
 ]
 
 type Props = {

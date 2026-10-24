@@ -2,6 +2,7 @@ import { Bot, Coffee, NotebookPen } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatHistoryDate, numberFormat, workoutTypeMeta } from '@/lib/format'
+import { formatPace } from '@/lib/cardio'
 import type { WorkoutLog } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
@@ -49,6 +50,22 @@ export function WorkoutDetail({ date, log }: { date: string; log?: WorkoutLog })
           <Stat label="Objętość" value={log.volume > 0 ? `${numberFormat.format(log.volume)} kg` : '—'} />
           <Stat label="Energia" value={`${log.energy}/5`} />
         </dl>
+
+        {log.cardio ? (
+          <div className="rounded-xl border border-border bg-secondary/30 p-3">
+            <h3 className="mb-2 text-sm font-semibold">Cardio</h3>
+            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <Stat label="Dystans" value={`${log.cardio.distance_km.toFixed(2)} km`} />
+              <Stat label="Śr. prędkość" value={log.cardio.average_speed_kmh === undefined ? '—' : `${log.cardio.average_speed_kmh} km/h`} />
+              <Stat label="Śr. tempo" value={formatPace(log.cardio.average_pace_seconds_per_km)} />
+              <Stat label="Kalorie" value={log.cardio.calories_kcal === undefined ? '—' : `${log.cardio.calories_kcal} kcal`} />
+              <Stat label="Maks. prędkość" value={log.cardio.max_speed_kmh === undefined ? '—' : `${log.cardio.max_speed_kmh} km/h`} />
+              <Stat label="Najszybsze tempo" value={formatPace(log.cardio.fastest_pace_seconds_per_km)} />
+              <Stat label="Nachylenie" value={log.cardio.max_incline_percent === undefined ? '—' : `${log.cardio.max_incline_percent}% maks.`} />
+              <Stat label="Przewyższenie" value={log.cardio.elevation_gain_m === undefined ? '—' : `${log.cardio.elevation_gain_m} m`} />
+            </dl>
+          </div>
+        ) : null}
 
         <div>
           <h3 className="mb-2 text-sm font-semibold">Ćwiczenia</h3>

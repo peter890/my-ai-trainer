@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { generateWorkoutAnalysis } from '@/lib/ai'
 import { numberFormat } from '@/lib/format'
+import { formatPace, getCardioSummary } from '@/lib/cardio'
 import { getAiApiKey, getAiProvider } from '@/lib/local-secrets'
 import { getProfile, getWorkouts, saveWorkout } from '@/lib/repositories'
 import type { Workout, WorkoutInput } from '@/lib/schemas'
@@ -40,6 +41,9 @@ function getWorkoutSummary(workout: Workout) {
     1,
     Math.round((Date.parse(workout.end_time ?? new Date().toISOString()) - Date.parse(workout.start_time)) / 60000),
   )
+  const cardioSummaries = workout.exercises
+    .filter((exercise) => exercise.cardio)
+    .map((exercise) => getCardioSummary(exercise.cardio!))
 
   return {
     title: workout.plan_name,
@@ -52,6 +56,15 @@ function getWorkoutSummary(workout: Workout) {
     volume,
     sets,
     prs: Math.max(0, Math.min(9, Math.ceil(volume / 500))),
+    cardio: cardioSummaries.length > 0
+      ? {
+          distanceKm: cardioSummaries.reduce((sum, item) => sum + (item.distanceKm ?? 0), 0),
+          caloriesKcal: cardioSummaries.reduce((sum, item) => sum + (item.caloriesKcal ?? 0), 0),
+          maxSpeedKmh: Math.max(...cardioSummaries.map((item) => item.maxSpeedKmh ?? 0)),
+          averagePaceSecondsPerKm: cardioSummaries.find((item) => item.averagePaceSecondsPerKm !== undefined)?.averagePaceSecondsPerKm,
+          elevationGainM: cardioSummaries.reduce((sum, item) => sum + (item.elevationGainM ?? 0), 0),
+        }
+      : undefined,
   }
 }
 
@@ -245,6 +258,18 @@ export function PostWorkoutFinalization({ onFinalized }: { onFinalized: () => vo
             <Stat icon={BatteryFull} label="Serie" value={`${summary.sets}`} />
             <Stat icon={Trophy} label="Rekordy" value={`${summary.prs} PR`} accent />
           </dl>
+          {summary.cardio ? (
+            <div className="rounded-xl border border-border bg-secondary/30 p-3 text-sm">
+              <p className="mb-2 font-semibold">Podsumowanie cardio</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <span>Dystans: <strong>{summary.cardio.distanceKm.toFixed(2)} km</strong></span>
+                <span>Tempo: <strong>{formatPace(summary.cardio.averagePaceSecondsPerKm)}</strong></span>
+                <span>Prędkość maks.: <strong>{summary.cardio.maxSpeedKmh || '—'} km/h</strong></span>
+                <span>Kalorie: <strong>{summary.cardio.caloriesKcal || '—'} kcal</strong></span>
+                <span>Przewyższenie: <strong>{summary.cardio.elevationGainM || '—'} m</strong></span>
+              </div>
+            </div>
+          ) : null}
 
           <fieldset disabled={status === 'loading' || status === 'saving' || status === 'done' || status === 'saved'}>
             <legend className="mb-2 text-sm font-medium">Poziom energii po treningu</legend>

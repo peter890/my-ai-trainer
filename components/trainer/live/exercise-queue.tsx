@@ -1,16 +1,15 @@
 import { Check } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { LoggedSet } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
 
 type Props = {
   exercises: { id: string; name: string; targetSets: number; targetReps: string }[]
-  setsByExercise: LoggedSet[][]
+  completedCounts: number[]
   activeIndex: number
   onSelect: (index: number) => void
 }
 
-export function ExerciseQueue({ exercises, setsByExercise, activeIndex, onSelect }: Props) {
+export function ExerciseQueue({ exercises, completedCounts, activeIndex, onSelect }: Props) {
   return (
     <Card>
       <CardHeader>
@@ -19,7 +18,7 @@ export function ExerciseQueue({ exercises, setsByExercise, activeIndex, onSelect
       <CardContent>
         <ol className="flex flex-col gap-1">
           {exercises.map((exercise, i) => {
-            const done = setsByExercise[i].length
+            const done = completedCounts[i] ?? 0
             const complete = done >= exercise.targetSets
             const active = i === activeIndex
             return (

@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const GenderSchema = z.enum(['male', 'female', 'other'])
 export const ExperienceLevelSchema = z.enum(['beginner', 'intermediate', 'advanced'])
 export const PrimaryGoalSchema = z.enum(['hypertrophy', 'strength', 'weight_loss', 'endurance'])
-export const MuscleGroupSchema = z.enum(['chest', 'back', 'shoulders', 'legs', 'arms', 'abs'])
+export const MuscleGroupSchema = z.enum(['chest', 'back', 'shoulders', 'legs', 'arms', 'abs', 'cardio'])
 export const EquipmentSchema = z.enum([
   'barbell',
   'dumbbell',
@@ -11,6 +11,7 @@ export const EquipmentSchema = z.enum([
   'machine',
   'calisthenics',
   'cardio',
+  'treadmill',
 ])
 export const RestTypeSchema = z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'cardio'])
 export const RestTimerSignalSchema = z.enum(['none', 'vibrate']).default('vibrate')
@@ -28,6 +29,20 @@ export const WorkoutLogSchema = z
     volume: z.number().nonnegative(),
     energy: z.number().int().min(1).max(5),
     notes: z.string().optional(),
+    cardio: z
+      .object({
+        distance_km: z.number().nonnegative(),
+        calories_kcal: z.number().nonnegative().optional(),
+        average_speed_kmh: z.number().nonnegative().optional(),
+        max_speed_kmh: z.number().nonnegative().optional(),
+        average_pace_seconds_per_km: z.number().positive().optional(),
+        fastest_pace_seconds_per_km: z.number().positive().optional(),
+        elevation_gain_m: z.number().nonnegative().optional(),
+        average_incline_percent: z.number().min(-20).max(45).optional(),
+        max_incline_percent: z.number().min(-20).max(45).optional(),
+      })
+      .strict()
+      .optional(),
     exercises: z.array(
       z
         .object({
@@ -227,6 +242,30 @@ export const LoggedSetSchema = z
   })
   .strict()
 
+export const CardioSegmentSchema = z
+  .object({
+    phase: z.enum(['warmup', 'main', 'cooldown', 'interval']).optional(),
+    duration_minutes: z.number().positive().max(1440),
+    distance_km: z.number().nonnegative().max(1000).optional(),
+    speed_kmh: z.number().nonnegative().max(100).optional(),
+    incline_percent: z.number().min(-20).max(45).optional(),
+    intensity_level: z.number().int().min(1).max(20).optional(),
+  })
+  .strict()
+
+export const CardioMetricsSchema = z
+  .object({
+    duration_minutes: z.number().positive().max(1440),
+    distance_km: z.number().nonnegative().max(1000).optional(),
+    calories_kcal: z.number().nonnegative().max(10000).optional(),
+    average_incline_percent: z.number().min(-20).max(45).optional(),
+    max_incline_percent: z.number().min(-20).max(45).optional(),
+    elevation_gain_m: z.number().nonnegative().max(100000).optional(),
+    workout_profile: z.string().trim().max(120).optional(),
+    segments: z.array(CardioSegmentSchema).max(100),
+  })
+  .strict()
+
 export const PlanExerciseSchema = z
   .object({
     exercise_id: z.string().min(1).max(100),
@@ -254,6 +293,7 @@ export const WorkoutExerciseSchema = z
     exercise_name: z.string().trim().min(1).max(120),
     sets: z.array(LoggedSetSchema),
     note_during_workout: z.string().max(4000).default(''),
+    cardio: CardioMetricsSchema.optional(),
   })
   .strict()
 
@@ -381,6 +421,8 @@ export type ExercisePreferencesInput = z.input<typeof ExercisePreferencesSchema>
 export type ProfileDocument = z.infer<typeof ProfileDocumentSchema>
 export type ProfileDocumentInput = z.input<typeof ProfileDocumentSchema>
 export type LoggedSet = z.infer<typeof LoggedSetSchema>
+export type CardioSegment = z.infer<typeof CardioSegmentSchema>
+export type CardioMetrics = z.infer<typeof CardioMetricsSchema>
 export type PlanExercise = z.infer<typeof PlanExerciseSchema>
 export type WorkoutPlan = z.infer<typeof WorkoutPlanSchema>
 export type WorkoutPlanInput = z.input<typeof WorkoutPlanSchema>

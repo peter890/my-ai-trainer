@@ -23,7 +23,7 @@ export type ExerciseDraft = {
   rest_type: RestType
 }
 
-export type EquipmentLabel = 'Sztanga' | 'Hantle' | 'Wyciąg' | 'Maszyna' | 'Kalistenika' | 'Kardio'
+export type EquipmentLabel = 'Sztanga' | 'Hantle' | 'Wyciąg' | 'Maszyna' | 'Kalistenika' | 'Kardio' | 'Bieżnia'
 
 const categoryByLabel: Record<MuscleGroup, MuscleCategory> = {
   Klatka: 'chest',
@@ -32,6 +32,7 @@ const categoryByLabel: Record<MuscleGroup, MuscleCategory> = {
   Nogi: 'legs',
   Ramiona: 'arms',
   Brzuch: 'abs',
+  Cardio: 'cardio',
 }
 
 const labelByCategory: Record<MuscleCategory, MuscleGroup> = {
@@ -41,6 +42,7 @@ const labelByCategory: Record<MuscleCategory, MuscleGroup> = {
   legs: 'Nogi',
   arms: 'Ramiona',
   abs: 'Brzuch',
+  cardio: 'Cardio',
 }
 
 const equipmentByLabel: Record<EquipmentLabel, Equipment> = {
@@ -50,6 +52,7 @@ const equipmentByLabel: Record<EquipmentLabel, Equipment> = {
   Maszyna: 'machine',
   Kalistenika: 'calisthenics',
   Kardio: 'cardio',
+  Bieżnia: 'treadmill',
 }
 
 const labelByEquipment: Record<Equipment, EquipmentLabel> = {
@@ -59,6 +62,7 @@ const labelByEquipment: Record<Equipment, EquipmentLabel> = {
   machine: 'Maszyna',
   calisthenics: 'Kalistenika',
   cardio: 'Kardio',
+  treadmill: 'Bieżnia',
 }
 
 export function toExerciseView(

@@ -1,4 +1,5 @@
 import { WorkoutLogSchema, type Workout, type WorkoutLog, type WorkoutType } from './schemas'
+import { formatPace, getCardioSummary } from './cardio'
 
 function inferWorkoutType(planName: string): WorkoutType {
   const value = planName.toLowerCase()
@@ -18,6 +19,38 @@ export function toWorkoutLog(workout: Workout): WorkoutLog {
   const startedAt = new Date(workout.start_time)
   const sets = workout.exercises.flatMap((exercise) => exercise.sets)
   const volume = sets.reduce((sum, set) => sum + set.weight_kg * set.reps, 0)
+  const cardioSummaries = workout.exercises
+    .filter((exercise) => exercise.cardio)
+    .map((exercise) => getCardioSummary(exercise.cardio!))
+  const cardio = cardioSummaries.length > 0
+    ? {
+        distance_km: cardioSummaries.reduce((sum, summary) => sum + (summary.distanceKm ?? 0), 0),
+        calories_kcal: cardioSummaries.some((summary) => summary.caloriesKcal !== undefined)
+          ? cardioSummaries.reduce((sum, summary) => sum + (summary.caloriesKcal ?? 0), 0)
+          : undefined,
+        average_speed_kmh: cardioSummaries.some((summary) => summary.averageSpeedKmh !== undefined)
+          ? cardioSummaries.reduce((sum, summary) => sum + (summary.averageSpeedKmh ?? 0), 0) / cardioSummaries.length
+          : undefined,
+        max_speed_kmh: cardioSummaries.some((summary) => summary.maxSpeedKmh !== undefined)
+          ? Math.max(...cardioSummaries.map((summary) => summary.maxSpeedKmh ?? 0))
+          : undefined,
+        average_pace_seconds_per_km: cardioSummaries.some((summary) => summary.averagePaceSecondsPerKm !== undefined)
+          ? cardioSummaries.reduce((sum, summary) => sum + (summary.averagePaceSecondsPerKm ?? 0), 0) / cardioSummaries.length
+          : undefined,
+        fastest_pace_seconds_per_km: cardioSummaries.some((summary) => summary.fastestPaceSecondsPerKm !== undefined)
+          ? Math.min(...cardioSummaries.map((summary) => summary.fastestPaceSecondsPerKm ?? Number.POSITIVE_INFINITY))
+          : undefined,
+        elevation_gain_m: cardioSummaries.some((summary) => summary.elevationGainM !== undefined)
+          ? cardioSummaries.reduce((sum, summary) => sum + (summary.elevationGainM ?? 0), 0)
+          : undefined,
+        average_incline_percent: cardioSummaries.some((summary) => summary.averageInclinePercent !== undefined)
+          ? cardioSummaries.reduce((sum, summary) => sum + (summary.averageInclinePercent ?? 0), 0) / cardioSummaries.length
+          : undefined,
+        max_incline_percent: cardioSummaries.some((summary) => summary.maxInclinePercent !== undefined)
+          ? Math.max(...cardioSummaries.map((summary) => summary.maxInclinePercent ?? 0))
+          : undefined,
+      }
+    : undefined
   const duration = workout.end_time
     ? Math.max(1, Math.round((Date.parse(workout.end_time) - startedAt.getTime()) / 60000))
     : 0
@@ -29,8 +62,18 @@ export function toWorkoutLog(workout: Workout): WorkoutLog {
 
     return {
       name: exercise.exercise_name,
-      sets: exercise.sets.length > 0 ? `${exercise.sets.length} × ${exercise.sets[0].reps}` : '0 × 0',
-      best: bestSet ? `${bestSet.weight_kg.toFixed(1).replace(/\.0$/, '')} kg × ${bestSet.reps}` : '—',
+      sets: exercise.cardio
+        ? `${exercise.cardio.duration_minutes} min`
+        : exercise.sets.length > 0 ? `${exercise.sets.length} × ${exercise.sets[0].reps}` : '0 × 0',
+      best: exercise.cardio
+        ? (() => {
+            const summary = getCardioSummary(exercise.cardio)
+            return [
+              summary.distanceKm === undefined ? undefined : `${summary.distanceKm} km`,
+              formatPace(summary.averagePaceSecondsPerKm),
+            ].filter(Boolean).join(' · ') || '—'
+          })()
+        : bestSet ? `${bestSet.weight_kg.toFixed(1).replace(/\.0$/, '')} kg × ${bestSet.reps}` : '—',
     }
   })
 
@@ -46,6 +89,7 @@ export function toWorkoutLog(workout: Workout): WorkoutLog {
     type: inferWorkoutType(workout.plan_name || 'Push'),
     duration,
     volume: Math.round(volume),
+    cardio,
     energy: workout.readiness_energy_score ?? 3,
     notes: workout.post_workout_user_notes || undefined,
     exercises,

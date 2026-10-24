@@ -6,9 +6,9 @@ export type { WorkoutLog, WorkoutType } from './schemas'
 
 export type LoggedSet = { weight: number; reps: number; rir: number }
 
-export type MuscleGroup = 'Klatka' | 'Plecy' | 'Barki' | 'Nogi' | 'Ramiona' | 'Brzuch'
+export type MuscleGroup = 'Klatka' | 'Plecy' | 'Barki' | 'Nogi' | 'Ramiona' | 'Brzuch' | 'Cardio'
 
-export const muscleGroups: MuscleGroup[] = ['Klatka', 'Plecy', 'Barki', 'Nogi', 'Ramiona', 'Brzuch']
+export const muscleGroups: MuscleGroup[] = ['Klatka', 'Plecy', 'Barki', 'Nogi', 'Ramiona', 'Brzuch', 'Cardio']
 
 export type Exercise = {
   id: string

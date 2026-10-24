@@ -25,13 +25,15 @@ import {
   type SessionExercise,
 } from '@/lib/live-session'
 import type { LoggedSet } from '@/lib/trainer-data'
-import type { Workout } from '@/lib/schemas'
+import type { CardioMetrics, Workout } from '@/lib/schemas'
+import { getCardioSummary } from '@/lib/cardio'
 import { getExpiredRestSignalEnd, sendRestCompletionSignal } from '@/lib/rest-signal'
 import { LiveWorkoutHeader } from './live-workout-header'
 import { ExerciseCard } from './exercise-card'
 import { SetsTable } from './sets-table'
 import { RestTimer } from './rest-timer'
 import { ExerciseQueue } from './exercise-queue'
+import { CardioMetricsForm } from './cardio-metrics-form'
 import { useScreenWakeLock } from './use-screen-wake-lock'
 
 type LiveWorkoutProps = {
@@ -76,6 +78,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
   const wakeLockStatus = useScreenWakeLock(Boolean(session && !session.paused))
   const [restSignal, setRestSignal] = useState<'none' | 'vibrate'>('vibrate')
   const [restSignalNotice, setRestSignalNotice] = useState('')
+  const [bodyWeightKg, setBodyWeightKg] = useState<number | undefined>()
   const lastSignaledRestEnd = useRef<number | null>(null)
 
   useEffect(() => {
@@ -94,6 +97,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
         const currentWorkout = workouts.find((workout) => workout.status === 'in_progress')
         setRecoveryWorkout(currentWorkout ?? null)
         setRestSignal(profile?.settings.rest_timer_signal ?? 'vibrate')
+        setBodyWeightKg(profile?.profile.weight_history.at(-1)?.weight_kg)
         const legacyPlanMatches = currentWorkout?.plan_id
           ? []
           : plans.filter((candidate) => candidate.name === currentWorkout?.plan_name)
@@ -226,6 +230,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
             rir: set.rir,
           })),
           note_during_workout: exercise.workoutNote,
+          cardio: exercise.completedCardio,
         })),
         paused_at: session.paused ? new Date(savedAt).toISOString() : undefined,
         paused_duration_ms: elapsedMs,
@@ -280,7 +285,10 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
   const sets = exercise?.completedSets ?? []
   const isLast = !!session && index === session.exercises.length - 1
   const totalTarget = session?.exercises.reduce((sum, item) => sum + item.targetSets, 0) ?? 0
-  const totalDone = session?.exercises.reduce((sum, item) => sum + item.completedSets.length, 0) ?? 0
+  const completedCount = (item: SessionExercise) => item.isCardio
+    ? item.completedCardio ? 1 : 0
+    : item.completedSets.length
+  const totalDone = session?.exercises.reduce((sum, item) => sum + completedCount(item), 0) ?? 0
 
   const togglePause = () => {
     const now = Date.now()
@@ -415,6 +423,23 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
     )
   }
 
+  const saveCardio = (cardio: CardioMetrics) => {
+    const estimatedCalories = getCardioSummary(cardio, bodyWeightKg).caloriesKcal
+    const savedCardio = cardio.calories_kcal === undefined && estimatedCalories !== undefined
+      ? { ...cardio, calories_kcal: estimatedCalories }
+      : cardio
+    setSession((current) =>
+      current
+        ? {
+            ...current,
+            exercises: current.exercises.map((item, itemIndex) =>
+              itemIndex === index ? { ...item, completedCardio: savedCardio } : item,
+            ),
+          }
+        : current,
+    )
+  }
+
   const adjustRest = (deltaMs: number) => {
     if (!session) return
     const now = Date.now()
@@ -457,6 +482,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
             rir: set.rir,
           })),
           note_during_workout: item.workoutNote,
+          cardio: item.completedCardio,
         })),
       }
 
@@ -579,11 +605,11 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
             lastTime={exercise.lastTime}
             targetSets={exercise.targetSets}
             targetReps={exercise.targetReps}
-            doneSets={sets.length}
+            doneSets={completedCount(exercise)}
             hasAlternatives={exercise.alternatives.length > 0}
             onSwap={() => {
               const alternative = exercise.alternatives[0]
-              if (!alternative || exercise.completedSets.length > 0) return
+              if (!alternative || completedCount(exercise) > 0) return
               const previousExercise = {
                 id: exercise.id,
                 name: exercise.name,
@@ -591,6 +617,7 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
                 restSeconds: exercise.restSeconds,
                 suggested: exercise.suggested,
                 lastTime: exercise.lastTime,
+                isCardio: exercise.isCardio,
               }
               setSession((current) => {
                 if (!current) return current
@@ -622,27 +649,36 @@ export function LiveWorkout({ planId, onMinimize, onAbort, onFinish }: LiveWorko
             }}
           />
           <div className="lg:hidden">{restTimer}</div>
-          <SetsTable
-            sets={sets}
-            targetSets={exercise.targetSets}
-            targetReps={exercise.targetReps}
-            draft={draft}
-            onDraftChange={(nextDraft) => {
-              setDraft(nextDraft)
-              setDraftError('')
-            }}
-            draftError={draftError}
-            onLogSet={logSet}
-            onEditSet={editSet}
-            onDeleteSet={deleteSet}
-          />
+          {exercise.isCardio ? (
+            <CardioMetricsForm
+              key={`${exercise.exercise_id}-${index}`}
+              value={exercise.completedCardio}
+              bodyWeightKg={bodyWeightKg}
+              onSave={saveCardio}
+            />
+          ) : (
+            <SetsTable
+              sets={sets}
+              targetSets={exercise.targetSets}
+              targetReps={exercise.targetReps}
+              draft={draft}
+              onDraftChange={(nextDraft) => {
+                setDraft(nextDraft)
+                setDraftError('')
+              }}
+              draftError={draftError}
+              onLogSet={logSet}
+              onEditSet={editSet}
+              onDeleteSet={deleteSet}
+            />
+          )}
         </div>
 
         <aside className="hidden flex-col gap-4 lg:flex">
           {restTimer}
           <ExerciseQueue
             exercises={session.exercises}
-            setsByExercise={session.exercises.map((item) => item.completedSets)}
+            completedCounts={session.exercises.map(completedCount)}
             activeIndex={index}
             onSelect={goTo}
           />
