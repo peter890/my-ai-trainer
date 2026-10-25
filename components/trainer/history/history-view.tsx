@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { getProfile, getWorkouts } from '@/lib/repositories'
+import { deleteWorkout, getProfile, getWorkouts, saveWorkout } from '@/lib/repositories'
 import { createWorkoutProgressSeries } from '@/lib/workout-progress'
 import { groupWorkoutLogsByDate, createWorkoutLogs } from '@/lib/workout-history'
 import type { WorkoutLog } from '@/lib/trainer-data'
+import type { Workout } from '@/lib/schemas'
 import { CalendarCard } from './calendar-card'
 import { StrengthProgressionChart } from './strength-progression-chart'
 import { WeightVolumeChart } from './weight-volume-chart'
@@ -20,6 +21,7 @@ export function HistoryView() {
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedWorkoutId, setSelectedWorkoutId] = useState('')
   const [logState, setLogState] = useState<WorkoutLog[]>([])
+  const [workoutState, setWorkoutState] = useState<Workout[]>([])
   const [weightVolumePoints, setWeightVolumePoints] = useState(
     [] as ReturnType<typeof createWorkoutProgressSeries>['weight_volume_points'],
   )
@@ -40,6 +42,7 @@ export function HistoryView() {
 
       setWeightVolumePoints(progressSeries.weight_volume_points)
       setStrengthProgressPoints(progressSeries.strength_progress_points)
+      setWorkoutState(workouts)
       setLogState(nextLogs)
       const latestWorkout = nextLogs[0]
       setSelectedDate((current) =>
@@ -74,6 +77,17 @@ export function HistoryView() {
   const selectedLog =
     logState.find((log) => log.id === selectedWorkoutId && log.date === effectiveSelectedDate) ??
     logsByDate.get(effectiveSelectedDate)?.[0]
+  const selectedWorkout = workoutState.find((workout) => workout.id === selectedLog?.id)
+
+  const updateWorkout = async (workout: Workout) => {
+    await saveWorkout(workout)
+    await loadHistory()
+  }
+
+  const removeWorkout = async (workout: Workout) => {
+    await deleteWorkout(workout.id)
+    await loadHistory()
+  }
 
   const changeMonth = (delta: number) =>
     setView(({ year, month }) => {
@@ -142,7 +156,13 @@ export function HistoryView() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <WorkoutDetail date={effectiveSelectedDate} log={selectedLog} />
+          <WorkoutDetail
+            date={effectiveSelectedDate}
+            log={selectedLog}
+            workout={selectedWorkout}
+            onSave={updateWorkout}
+            onDelete={removeWorkout}
+          />
           <Card>
             <CardHeader>
               <CardTitle className="font-semibold">Waga i tonaż</CardTitle>

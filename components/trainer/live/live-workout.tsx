@@ -524,13 +524,24 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
 
   const finishWorkout = async () => {
     if (!session || isFinalizingRef.current) return
-    if (session.exercises.length === 0) {
-      setFinishError('Dodaj co najmniej jedno ćwiczenie przed zakończeniem treningu.')
-      return
-    }
     isFinalizingRef.current = true
     setIsFinishing(true)
     setFinishError('')
+
+    if (session.exercises.length === 0) {
+      try {
+        await deleteLiveSessionSnapshot()
+        setIsFinishDialogOpen(false)
+        onAbort()
+      } catch (cause) {
+        setFinishError(cause instanceof Error ? cause.message : 'Nie udało się anulować pustego treningu.')
+      } finally {
+        isFinalizingRef.current = false
+        setIsFinishing(false)
+      }
+      return
+    }
+
     const now = Date.now()
 
     try {
@@ -824,7 +835,9 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
               Zakończyć trening?
             </h2>
             <p id="finish-workout-description" className="mt-2 text-sm text-muted-foreground">
-              Zapisane ćwiczenia i serie zostaną zachowane, a trening będzie oczekiwał na finalizację.
+              {session.exercises.length === 0
+                ? 'Pusty trening zostanie anulowany i nie pojawi się w historii.'
+                : 'Zapisane ćwiczenia i serie zostaną zachowane, a trening będzie oczekiwał na finalizację.'}
             </p>
             {finishError ? (
               <p role="alert" className="mt-3 text-sm text-destructive">
@@ -850,7 +863,9 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
                 disabled={isFinishing}
                 onClick={() => void finishWorkout()}
               >
-                {isFinishing ? 'Zapisywanie…' : 'Zakończ trening'}
+                {isFinishing
+                  ? session.exercises.length === 0 ? 'Anulowanie…' : 'Zapisywanie…'
+                  : session.exercises.length === 0 ? 'Anuluj trening' : 'Zakończ trening'}
               </Button>
             </div>
           </section>
