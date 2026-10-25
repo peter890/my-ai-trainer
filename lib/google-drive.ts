@@ -285,6 +285,24 @@ export async function listGoogleDriveAppDataFiles(): Promise<GoogleDriveFile[]> 
   return z.array(GoogleDriveFileSchema).parse(Array.isArray(payload.files) ? payload.files : [])
 }
 
+export async function clearGoogleDriveAppData(): Promise<number> {
+  const files = await listGoogleDriveAppDataFiles()
+  let deletedCount = 0
+
+  for (const file of files) {
+    const response = await fetchDriveResource(`/drive/v3/files/${encodeURIComponent(file.id)}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) {
+      const details = await response.text().catch(() => '')
+      throw new Error(details || `Nie udało się usunąć pliku ${file.name} z Google Drive.`)
+    }
+    deletedCount += 1
+  }
+
+  return deletedCount
+}
+
 function getNewestDriveFile(files: GoogleDriveFile[], fileName: string): GoogleDriveFile | undefined {
   return files
     .filter((file) => file.name === fileName)

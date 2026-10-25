@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CheckCircle2, Cloud, CloudOff, Loader2, LogOut, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Cloud, CloudOff, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   connectGoogleDrive,
+  clearGoogleDriveAppData,
   createDriveSyncSummary,
   disconnectGoogleDrive,
   getDriveSyncQueueLength,
@@ -23,6 +24,9 @@ export function DriveSyncCard() {
   const [error, setError] = useState('')
   const [queueLength, setQueueLength] = useState(0)
   const [syncing, setSyncing] = useState(false)
+  const [clearDialogOpen, setClearDialogOpen] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [clearError, setClearError] = useState('')
 
   useEffect(() => {
     const syncState = () => {
@@ -106,6 +110,29 @@ export function DriveSyncCard() {
       setMessage('Synchronizacja zakończyła się błędem.')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleClearDriveData = async () => {
+    if (!isGoogleDriveConnected()) {
+      setClearError('Połącz się z Google Drive, aby wyczyścić dane zdalne.')
+      return
+    }
+
+    setClearing(true)
+    setClearError('')
+    try {
+      const deletedCount = await clearGoogleDriveAppData()
+      setMessage(
+        deletedCount === 0
+          ? 'Google Drive nie zawierało danych AI Trainer. Dane lokalne pozostały bez zmian.'
+          : `Usunięto ${deletedCount} plik${deletedCount === 1 ? '' : 'ów'} z Google Drive. Dane lokalne pozostały bez zmian.`,
+      )
+      setClearDialogOpen(false)
+    } catch (cause) {
+      setClearError(cause instanceof Error ? cause.message : 'Nie udało się wyczyścić danych Google Drive.')
+    } finally {
+      setClearing(false)
     }
   }
 
@@ -201,6 +228,22 @@ export function DriveSyncCard() {
                   )}
                 </button>
               ) : null}
+
+              {connected ? (
+                <button
+                  type="button"
+                  onClick={() => { setClearError(''); setClearDialogOpen(true) }}
+                  disabled={status === 'connecting' || syncing || clearing}
+                  className={cn(
+                    'flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-medium transition-colors',
+                    'border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15',
+                    (status === 'connecting' || syncing || clearing) && 'cursor-wait opacity-70',
+                  )}
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Wyczyść dane Google Drive
+                </button>
+              ) : null}
             </>
           )}
 
@@ -222,6 +265,62 @@ export function DriveSyncCard() {
           </p>
         </div>
       </CardContent>
+
+      {clearDialogOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !clearing) setClearDialogOpen(false)
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="clear-drive-title"
+            aria-describedby="clear-drive-description"
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !clearing) setClearDialogOpen(false)
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden="true" />
+              <div>
+                <h2 id="clear-drive-title" className="text-lg font-semibold">
+                  Wyczyścić dane Google Drive?
+                </h2>
+                <p id="clear-drive-description" className="mt-2 text-sm text-muted-foreground">
+                  Wszystkie pliki AI Trainer z folderu aplikacji Google Drive zostaną usunięte. Dane lokalne w tej przeglądarce pozostaną bez zmian.
+                </p>
+              </div>
+            </div>
+            {clearError ? (
+              <p role="alert" className="mt-3 text-sm text-destructive">
+                Nie udało się wyczyścić danych: {clearError}
+              </p>
+            ) : null}
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={clearing}
+                onClick={() => setClearDialogOpen(false)}
+                className="flex h-10 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium hover:bg-secondary"
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                disabled={clearing}
+                onClick={() => void handleClearDriveData()}
+                className="flex h-10 items-center justify-center gap-2 rounded-xl bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:cursor-wait disabled:opacity-70"
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+                {clearing ? 'Czyszczenie…' : 'Wyczyść dane'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </Card>
   )
 }

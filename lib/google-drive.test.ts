@@ -3,6 +3,7 @@ import {
   GoogleDriveFileSchema,
   GOOGLE_DRIVE_FILE_NAMES,
   GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+  clearGoogleDriveAppData,
   clearDriveSyncQueue,
   compareDriveTimestamps,
   connectGoogleDrive,
@@ -146,6 +147,39 @@ describe('google drive helpers', () => {
 
     clearDriveSyncQueue(storage)
     expect(readDriveSyncQueue(storage)).toHaveLength(0)
+  })
+
+  it('deletes every file in the Google Drive app data folder', async () => {
+    const storage = createMemoryStorage()
+    storage.setItem(
+      GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+      JSON.stringify({ access_token: 'test-token', expires_at: Date.now() + 3_600_000 }),
+    )
+    vi.stubGlobal('window', { localStorage: storage, dispatchEvent: vi.fn() })
+
+    const deletedUrls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (init?.method === 'DELETE') {
+          deletedUrls.push(url)
+          return new Response(null, { status: 204 })
+        }
+        return new Response(JSON.stringify({
+          files: [
+            { id: 'profile-old', name: 'user_profile.json', mimeType: 'application/json' },
+            { id: 'workouts-current', name: 'workouts_history.json', mimeType: 'application/json' },
+          ],
+        }), { status: 200 })
+      }) as typeof fetch,
+    )
+
+    await expect(clearGoogleDriveAppData()).resolves.toBe(2)
+    expect(deletedUrls).toEqual([
+      'https://www.googleapis.com/drive/v3/files/profile-old',
+      'https://www.googleapis.com/drive/v3/files/workouts-current',
+    ])
   })
 
   it('uploads local replicas as versioned files and clears the queue only after both uploads succeed', async () => {
