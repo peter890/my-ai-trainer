@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,7 +12,6 @@ import { cn } from '@/lib/utils'
 const genderOptions: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Mężczyzna' },
   { value: 'female', label: 'Kobieta' },
-  { value: 'other', label: 'Inna' },
 ]
 const experienceOptions: { value: ExperienceLevel; label: string }[] = [
   { value: 'beginner', label: 'Początkujący' },
@@ -65,6 +65,28 @@ export function BiometricsCard({
 }: BiometricsCardProps) {
   const h = height / 100
   const bmi = h > 0 ? weight / (h * h) : 0
+  const [ageDraft, setAgeDraft] = useState(String(age))
+  const [heightDraft, setHeightDraft] = useState(String(height))
+
+  const commitAge = () => {
+    const parsed = Number(ageDraft)
+    if (Number.isFinite(parsed) && parsed >= 13 && parsed <= 120) {
+      onAgeChange(parsed)
+      setAgeDraft(String(parsed))
+    } else {
+      setAgeDraft(String(age))
+    }
+  }
+
+  const commitHeight = () => {
+    const parsed = Number(heightDraft)
+    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 300) {
+      onHeightChange(parsed)
+      setHeightDraft(String(parsed))
+    } else {
+      setHeightDraft(String(height))
+    }
+  }
 
   return (
     <Card>
@@ -75,7 +97,7 @@ export function BiometricsCard({
       <CardContent className="flex flex-col gap-5">
         <fieldset>
           <legend className="mb-2 text-sm font-medium">Płeć</legend>
-          <div className="grid grid-cols-3 gap-1 rounded-xl bg-secondary/60 p-1">
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/60 p-1">
             {genderOptions.map(({ value, label }) => (
               <button
                 key={value}
@@ -94,13 +116,14 @@ export function BiometricsCard({
         </fieldset>
 
         <div className="grid grid-cols-3 gap-3">
-          <Field id="age" label="Wiek" unit="lat" value={String(age)} onChange={(v) => onAgeChange(Number(v) || 0)} />
+          <Field id="age" label="Wiek" unit="lat" value={ageDraft} onChange={setAgeDraft} onBlur={commitAge} />
           <Field
             id="height"
             label="Wzrost"
             unit="cm"
-            value={String(height)}
-            onChange={(v) => onHeightChange(Number(v) || 0)}
+            value={heightDraft}
+            onChange={setHeightDraft}
+            onBlur={commitHeight}
           />
           <Field id="weight" label="Waga" unit="kg" value={weight.toLocaleString('pl-PL')} readOnly />
         </div>
@@ -191,6 +214,7 @@ function Field({
   unit,
   value,
   onChange,
+  onBlur,
   readOnly,
 }: {
   id: string
@@ -198,6 +222,7 @@ function Field({
   unit: string
   value: string
   onChange?: (v: string) => void
+  onBlur?: () => void
   readOnly?: boolean
 }) {
   return (
@@ -209,6 +234,7 @@ function Field({
           inputMode="numeric"
           value={value}
           readOnly={readOnly}
+          onBlur={onBlur}
           onChange={(e) => onChange?.(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
           className={cn('h-11 pr-9 tabular-nums', readOnly && 'text-muted-foreground')}
         />
