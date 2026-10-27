@@ -188,7 +188,7 @@ export async function generateWorkoutPlan(
         .object({
           id: z.string().trim().min(1).max(100),
           name: z.string().trim().min(1).max(120),
-          muscle: z.enum(['Klatka', 'Plecy', 'Barki', 'Nogi', 'Ramiona', 'Brzuch']),
+          muscle: z.enum(['Klatka', 'Plecy', 'Barki', 'Nogi', 'Ramiona', 'Brzuch', 'Cardio']),
           equipment: z.string().trim().min(1).max(40),
           restType: z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'cardio']),
           techniqueNote: z.string().max(2000),
@@ -222,6 +222,8 @@ Wymagania:
 - wybieraj tylko exercise_id z listy available_exercises,
 - każde ćwiczenie w danym dniu może wystąpić tylko raz,
 - zakres scheme dopasuj do celu i poziomu,
+- dla ćwiczeń siłowych używaj formatu "serie x powtórzenia", np. "4 x 6-8",
+- dla ćwiczeń cardio używaj formatu "1 x liczba minut", np. "1 x 20 min",
 - nazwy dni zapisuj wyłącznie po polsku, np. "Góra A", "Dół A", "Góra B", "Dół B"; nie używaj nazw "Push", "Pull" ani "Legs",
 - uwzględnij profil użytkownika, jeśli podano,
 - jeśli prefer_favorites = true, preferuj ćwiczenia oznaczone jako favorite.

@@ -45,4 +45,22 @@ describe('createWorkoutPlan', () => {
       createWorkoutPlan({ name: 'Push', exercises: [] }, 'plan-empty', '2026-10-16T12:00:00.000Z'),
     ).toThrow()
   })
+
+  it('converts a cardio duration scheme into a valid plan exercise', () => {
+    expect(
+      createWorkoutPlan(
+        {
+          name: 'Cardio A',
+          exercises: [{ id: 'treadmill', restType: 'cardio', scheme: '1 x 20 min' }],
+        },
+        'plan-cardio',
+        '2026-10-16T12:00:00.000Z',
+      ).exercises[0],
+    ).toMatchObject({
+      exercise_id: 'treadmill',
+      target_sets: 1,
+      target_reps: '20',
+      rest_type: 'cardio',
+    })
+  })
 })
