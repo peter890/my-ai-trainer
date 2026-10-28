@@ -1,4 +1,5 @@
-const CACHE_NAME = 'ai-trainer-shell-v3'
+const BUILD_ID = '__BUILD_ID__'
+const CACHE_NAME = `ai-trainer-shell-${BUILD_ID}`
 const APP_SHELL = [
   '/',
   '/icon.svg',
@@ -15,8 +16,14 @@ const CACHEABLE_ASSETS = new Set([
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
   )
+})
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    void self.skipWaiting()
+  }
 })
 
 self.addEventListener('activate', (event) => {
@@ -56,19 +63,20 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')) {
     event.respondWith(
-      caches.match(request).then(async (cached) => {
-        if (cached) return cached
-
-        const cachedShell = await caches.match('/')
-        if (cachedShell) return cachedShell
-
-        return fetch(request).then((response) => {
+      Promise.race([
+        fetch(request).then((response) => {
           if (response.ok) {
             const responseClone = response.clone()
             void caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
           }
           return response
-        })
+        }),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Navigation request timed out')), 3000)
+        }),
+      ]).catch(async () => {
+        const cached = await caches.match(request)
+        return cached ?? caches.match('/')
       }),
     )
     return
