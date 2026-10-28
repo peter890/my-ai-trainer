@@ -269,7 +269,9 @@ export function ExerciseCatalog({
                     </div>
                   </div>
                 ) : e.techniqueNote ? (
-                  <p className="border-t border-border/70 pt-2 text-xs text-muted-foreground">{e.techniqueNote}</p>
+                  <p className="max-w-full whitespace-pre-wrap break-words border-t border-border/70 pt-2 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                    {e.techniqueNote}
+                  </p>
                 ) : null}
               </li>
             ))}
