@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import {
   DRIVE_QUEUE_EVENT,
   DRIVE_SYNC_RESULT_EVENT,
-  getDriveSyncQueueLength,
   isGoogleDriveConnected,
   syncDriveReplica,
   trySilentGoogleDriveConnection,
@@ -28,7 +27,7 @@ export function PwaRegister() {
     let syncInProgress = false
 
     const syncPendingChanges = async () => {
-      if (syncInProgress || getDriveSyncQueueLength() === 0) return
+      if (syncInProgress) return
 
       syncInProgress = true
       try {
