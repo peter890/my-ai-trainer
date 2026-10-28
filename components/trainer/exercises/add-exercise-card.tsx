@@ -15,6 +15,7 @@ const restOptions: { value: RestType; label: string }[] = [
   { value: 'heavy_compound', label: 'Ciężkie' },
   { value: 'moderate_compound', label: 'Złożone' },
   { value: 'isolation', label: 'Izolowane' },
+  { value: 'isometric', label: 'Izometryczne' },
   { value: 'cardio', label: 'Kardio' },
 ]
 

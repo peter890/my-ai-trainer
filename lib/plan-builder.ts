@@ -4,7 +4,7 @@ export type GeneratedPlanDay = {
   name: string
   exercises: {
     id: string
-    restType: 'heavy_compound' | 'moderate_compound' | 'isolation' | 'cardio'
+    restType: 'heavy_compound' | 'moderate_compound' | 'isolation' | 'isometric' | 'cardio'
     scheme: string
   }[]
 }

@@ -32,6 +32,22 @@
     "technique_note": "Zejdź tylko tak nisko, jak pozwala bezbolesny zakres ruchu."
   },
   {
+    "id": "chest-press-machine",
+    "name": "Wyciskanie na maszynie",
+    "category": "chest",
+    "equipment": "machine",
+    "rest_type": "moderate_compound",
+    "technique_note": "Oprzyj całe plecy o oparcie i wypychaj ciężar, kontrolując powrót."
+  },
+  {
+    "id": "chest-fly-machine",
+    "name": "Rozpiętki na maszynie (Butterfly)",
+    "category": "chest",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Utrzymuj łokcie na wysokości barków i skup się na ściskaniu klatki."
+  },
+  {
     "id": "pull-up",
     "name": "Podciąganie nachwytem",
     "category": "back",
@@ -49,11 +65,19 @@
   },
   {
     "id": "lat-pulldown",
-    "name": "Ściąganie drążka wąsko",
+    "name": "Ściąganie drążka wyciągu",
     "category": "back",
     "equipment": "cable",
     "rest_type": "moderate_compound",
-    "technique_note": "Ściągaj drążek do górnej części klatki bez odchylania tułowia."
+    "technique_note": "Ściągaj drążek do górnej części klatki bez nadmiernego odchylania tułowia."
+  },
+  {
+    "id": "back-extension",
+    "name": "Prostowanie grzbietu (Ławka rzymska)",
+    "category": "back",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Unoś tułów do linii prostej, unikając przeprostu w odcinku lędźwiowym."
   },
   {
     "id": "overhead-press",
@@ -78,6 +102,22 @@
     "equipment": "cable",
     "rest_type": "isolation",
     "technique_note": "Przyciągaj linę w kierunku twarzy, rotując dłonie na zewnątrz."
+  },
+  {
+    "id": "shoulder-press-machine",
+    "name": "Wyciskanie na barki na maszynie",
+    "category": "shoulders",
+    "equipment": "machine",
+    "rest_type": "moderate_compound",
+    "technique_note": "Wyciskaj ciężar w górę, nie odrywając pośladków i pleców od siedzenia."
+  },
+  {
+    "id": "reverse-fly-machine",
+    "name": "Odwrotne rozpiętki na maszynie",
+    "category": "shoulders",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Pracuj tyłem barków i górną częścią pleców, trzymając ręce na wysokości ramion."
   },
   {
     "id": "barbell-squat",
@@ -112,6 +152,38 @@
     "technique_note": "Utrzymuj stabilną pozycję i kontroluj zejście przedniej nogi."
   },
   {
+    "id": "leg-extension",
+    "name": "Prostowanie nóg na maszynie",
+    "category": "legs",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Wypuszczaj powietrze przy wyproście, przytrzymując ciężar na górze przez ułamek sekundy."
+  },
+  {
+    "id": "leg-curl",
+    "name": "Uginanie nóg na maszynie",
+    "category": "legs",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Nie odrywaj bioder od ławki/siedzenia podczas uginania kolan."
+  },
+  {
+    "id": "adductor-machine",
+    "name": "Przywodzenie na maszynie (Adductor)",
+    "category": "legs",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Ściskaj uda do środka płynnym ruchem, pracując wewnętrzną stroną ud."
+  },
+  {
+    "id": "abductor-machine",
+    "name": "Odwodzenie na maszynie (Abductor)",
+    "category": "legs",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Rozpychaj kolana na zewnątrz, angażując mięśnie pośladkowe średnie."
+  },
+  {
     "id": "dumbbell-curl",
     "name": "Uginanie z hantlami",
     "category": "arms",
@@ -128,11 +200,19 @@
     "technique_note": "Utrzymuj łokcie nieruchomo przy tułowiu i kontroluj powrót."
   },
   {
+    "id": "triceps-press-machine",
+    "name": "Wyciskanie na triceps na maszynie",
+    "category": "arms",
+    "equipment": "machine",
+    "rest_type": "moderate_compound",
+    "technique_note": "Wypychaj uchwyty w dół lub w przód, skupiając się na pracy ramion."
+  },
+  {
     "id": "plank",
     "name": "Plank",
     "category": "abs",
     "equipment": "calisthenics",
-    "rest_type": "isolation",
+    "rest_type": "isometric",
     "technique_note": "Utrzymuj ciało w jednej linii i napnij brzuch oraz pośladki."
   },
   {
@@ -144,11 +224,27 @@
     "technique_note": "Zwijaj tułów przez pracę mięśni brzucha, bez ciągnięcia rękami."
   },
   {
+    "id": "abdominal-machine",
+    "name": "Spięcia brzucha na maszynie",
+    "category": "abs",
+    "equipment": "machine",
+    "rest_type": "isolation",
+    "technique_note": "Zginaj tułów powoli, wykorzystując opór stosu do pracy mięśnia prostego brzucha."
+  },
+  {
     "id": "treadmill",
     "name": "Bieżnia",
     "category": "cardio",
     "equipment": "treadmill",
     "rest_type": "cardio",
     "technique_note": "Dobierz prędkość i nachylenie do programu oraz aktualnej intensywności treningu."
+  },
+  {
+    "id": "push-up",
+    "name": "Klasyczne pompki na podłodze",
+    "category": "chest",
+    "equipment": "calisthenics",
+    "rest_type": "moderate_compound",
+    "technique_note": "Utrzymuj ciało w jednej linii, napnij brzuch i pośladki, opuszczaj klatkę piersiową blisko podłogi."
   }
 ]

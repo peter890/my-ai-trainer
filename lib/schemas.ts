@@ -13,7 +13,7 @@ export const EquipmentSchema = z.enum([
   'cardio',
   'treadmill',
 ])
-export const RestTypeSchema = z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'cardio'])
+export const RestTypeSchema = z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'isometric', 'cardio'])
 export const RestTimerSignalSchema = z.enum(['none', 'vibrate']).default('vibrate')
 export const WorkoutTypeSchema = z.enum(['push', 'pull', 'legs', 'cardio'])
 export const WorkoutModeSchema = z.enum(['planned', 'free'])
@@ -202,6 +202,7 @@ export const ProfileDocumentSchema = z
             heavy_compound: z.number().int().min(1).max(3600),
             moderate_compound: z.number().int().min(1).max(3600),
             isolation: z.number().int().min(1).max(3600),
+            isometric: z.number().int().min(1).max(3600).default(45),
           })
           .strict(),
           rest_timer_signal: RestTimerSignalSchema,

@@ -94,6 +94,23 @@ export async function saveExercisePreferences(
 export async function deleteExercise(id: string, database?: Database): Promise<void> {
   const validId = EntityIdSchema.parse(id)
   const db = await databaseOrDefault(database)
+  const exercise = await db.get('exercises', validId)
+  if (!exercise) return
+
+  const [plans, workouts] = await Promise.all([db.getAll('plans'), db.getAll('workouts')])
+  const isReferenced =
+    plans.some((plan) => plan.exercises.some((item) => item.exercise_id === validId)) ||
+    workouts.some((workout) => workout.exercises.some((item) => item.exercise_id === validId))
+
+  if (isReferenced || !exercise.custom) {
+    await db.put('exercises', {
+      ...exercise,
+      active: false,
+      updated_at: new Date().toISOString(),
+    })
+    return
+  }
+
   await db.delete('exercises', validId)
 }
 

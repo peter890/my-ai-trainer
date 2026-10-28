@@ -2,11 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  DRIVE_QUEUE_EVENT,
+  DRIVE_SYNC_RESULT_EVENT,
+  getDriveSyncQueueLength,
+  isGoogleDriveConnected,
+  syncDriveReplica,
+  trySilentGoogleDriveConnection,
+} from '@/lib/google-drive'
+import { getProfile, getWorkouts } from '@/lib/repositories'
 
 export function PwaRegister() {
   const [updateReady, setUpdateReady] = useState(false)
 
   useEffect(() => {
+    void trySilentGoogleDriveConnection()
+
     if (!('serviceWorker' in navigator)) {
       return
     }
@@ -14,6 +25,26 @@ export function PwaRegister() {
     let disposed = false
     let reloading = false
     let registration: ServiceWorkerRegistration | undefined
+    let syncInProgress = false
+
+    const syncPendingChanges = async () => {
+      if (syncInProgress || getDriveSyncQueueLength() === 0) return
+
+      syncInProgress = true
+      try {
+        await trySilentGoogleDriveConnection()
+        if (!isGoogleDriveConnected()) return
+
+        const [profile, workouts] = await Promise.all([getProfile(), getWorkouts()])
+        const result = await syncDriveReplica(profile, workouts)
+        window.dispatchEvent(new CustomEvent(DRIVE_SYNC_RESULT_EVENT, { detail: result }))
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : 'Nie udało się zsynchronizować danych z Google Drive.'
+        window.dispatchEvent(new CustomEvent(DRIVE_SYNC_RESULT_EVENT, { detail: { status: 'error', message } }))
+      } finally {
+        syncInProgress = false
+      }
+    }
 
     const applyUpdate = () => {
       if (reloading || !registration?.waiting) return
@@ -32,7 +63,9 @@ export function PwaRegister() {
 
     const handleOnline = () => {
       void registration?.update().catch(() => undefined)
+      void syncPendingChanges()
     }
+    const handleQueueChanged = () => void syncPendingChanges()
 
     void navigator.serviceWorker
       .register('/sw.js')
@@ -67,6 +100,8 @@ export function PwaRegister() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('pageshow', handleOnline)
     window.addEventListener('online', handleOnline)
+    window.addEventListener(DRIVE_QUEUE_EVENT, handleQueueChanged)
+    void syncPendingChanges()
 
     return () => {
       disposed = true
@@ -74,6 +109,7 @@ export function PwaRegister() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('pageshow', handleOnline)
       window.removeEventListener('online', handleOnline)
+      window.removeEventListener(DRIVE_QUEUE_EVENT, handleQueueChanged)
     }
   }, [])
 

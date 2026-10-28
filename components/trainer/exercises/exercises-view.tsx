@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { Exercise, ExercisePreferences } from '@/lib/schemas'
 import { createExerciseRecord, initializeExerciseCatalog, toExerciseView } from '@/lib/exercise-catalog'
-import { saveExercise, saveExercisePreferences } from '@/lib/repositories'
+import { deleteExercise, saveExercise, saveExercisePreferences } from '@/lib/repositories'
 import type { ExerciseDraft } from '@/lib/exercise-catalog'
 import { ExerciseCatalog } from './exercise-catalog'
 import { AddExerciseCard } from './add-exercise-card'
@@ -131,6 +131,17 @@ export function ExercisesView() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Nie udało się dodać ćwiczenia.')
     }
+
+  }
+
+  const remove = async (id: string) => {
+    try {
+      await deleteExercise(id)
+      await loadCatalog()
+      setError('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Nie udało się usunąć ćwiczenia.')
+    }
   }
 
   if (loading) {
@@ -172,6 +183,7 @@ export function ExercisesView() {
               onToggle={(id, key) => void toggle(id, key)}
               onToggleActive={(id) => void toggleActive(id)}
               onSaveTechniqueNote={updateTechniqueNote}
+              onDelete={(id) => void remove(id)}
             />
             <AddExerciseCard onAdd={add} />
           </div>

@@ -7,6 +7,7 @@ import {
   connectGoogleDrive,
   clearGoogleDriveAppData,
   createDriveSyncSummary,
+  DRIVE_SYNC_RESULT_EVENT,
   disconnectGoogleDrive,
   getDriveSyncQueueLength,
   hasGoogleDriveClientId,
@@ -53,9 +54,25 @@ export function DriveSyncCard() {
         setError(cause instanceof Error ? cause.message : 'Nie można odczytać kolejki synchronizacji.')
       }
     })
+    const handleAutomaticSync = (event: Event) => {
+      const result = (event as CustomEvent<{ status: string; message: string }>).detail
+      if (!result) return
+
+      setQueueLength(getDriveSyncQueueLength())
+      setMessage(result.message)
+      if (result.status === 'synced') {
+        setStatus('connected')
+        setError('')
+      } else if (result.status === 'conflict' || result.status === 'error') {
+        setStatus('error')
+        setError(result.message)
+      }
+    }
+    window.addEventListener(DRIVE_SYNC_RESULT_EVENT, handleAutomaticSync)
     return () => {
       unsubscribeToken()
       unsubscribeQueue()
+      window.removeEventListener(DRIVE_SYNC_RESULT_EVENT, handleAutomaticSync)
     }
   }, [])
 
@@ -69,6 +86,7 @@ export function DriveSyncCard() {
       setStatus('connected')
       setQueueLength(getDriveSyncQueueLength())
       setMessage(createDriveSyncSummary())
+      await handleSyncNow()
     } catch (cause) {
       setStatus('error')
       setError(cause instanceof Error ? cause.message : 'Nie udało się połączyć z Google Drive.')

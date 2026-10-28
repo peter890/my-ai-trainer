@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Ban, Check, CircleCheck, CircleX, Pencil, Search, Star, X } from 'lucide-react'
+import { Ban, Check, CircleCheck, CircleX, Pencil, Search, Star, Trash2, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,6 +28,7 @@ type Props = {
   onToggle: (id: string, key: 'favorite' | 'excluded') => void
   onToggleActive: (id: string) => void
   onSaveTechniqueNote: (id: string, note: string) => Promise<boolean>
+  onDelete: (id: string) => void
 }
 
 export function ExerciseCatalog({
@@ -35,6 +36,7 @@ export function ExerciseCatalog({
   onToggle,
   onToggleActive,
   onSaveTechniqueNote,
+  onDelete,
 }: Props) {
   const [query, setQuery] = useState('')
   const [muscle, setMuscle] = useState<MuscleGroup | 'all'>('all')
@@ -43,6 +45,7 @@ export function ExerciseCatalog({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [savingNote, setSavingNote] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<Exercise | null>(null)
 
   const visible = filterExercisesByEquipment(exercises, equipment).filter(
     (e) =>
@@ -282,11 +285,74 @@ export function ExerciseCatalog({
                     {e.techniqueNote}
                   </p>
                 ) : null}
+                {e.custom ? (
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(e)}
+                    aria-label={`Usuń lub zarchiwizuj ćwiczenie: ${e.name}`}
+                    className="flex h-9 w-full items-center justify-center gap-2 border-t border-border/70 pt-2 text-xs font-medium text-destructive/75 transition-colors hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" aria-hidden="true" />
+                    Usuń lub archiwizuj
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
       </CardContent>
+      {pendingDelete ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setPendingDelete(null)
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-exercise-title"
+            aria-describedby="delete-exercise-description"
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setPendingDelete(null)
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <Trash2 className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden="true" />
+              <div>
+                <h2 id="delete-exercise-title" className="text-lg font-semibold">
+                  Usunąć własne ćwiczenie?
+                </h2>
+                <p id="delete-exercise-description" className="mt-2 text-sm text-muted-foreground">
+                  Ćwiczenie „{pendingDelete.name}” zostanie usunięte, jeśli nie jest używane. Jeśli znajduje się w planie
+                  lub historii, zostanie bezpiecznie zarchiwizowane.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                className="flex h-10 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium hover:bg-secondary"
+              >
+                Anuluj
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(pendingDelete.id)
+                  setPendingDelete(null)
+                }}
+                className="flex h-10 items-center justify-center gap-2 rounded-xl bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+                Usuń lub archiwizuj
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </Card>
   )
 }

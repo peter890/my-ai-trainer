@@ -15,6 +15,7 @@ const restSettings: { key: RestTypeSetting; label: string }[] = [
   { key: 'heavy_compound', label: 'Ciężkie ćwiczenia wielostawowe' },
   { key: 'moderate_compound', label: 'Umiarkowane ćwiczenia wielostawowe' },
   { key: 'isolation', label: 'Ćwiczenia izolowane' },
+  { key: 'isometric', label: 'Ćwiczenia izometryczne' },
 ]
 
 export function RestSettingsCard({
@@ -36,7 +37,7 @@ export function RestSettingsCard({
           Czas przerwy dobierany do typu ćwiczenia. Możesz go też zmienić podczas treningu.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-3">
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {restSettings.map(({ key, label }) => (
           <RestDurationField
             key={`${key}-${values[key]}`}

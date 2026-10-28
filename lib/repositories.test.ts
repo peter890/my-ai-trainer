@@ -49,6 +49,7 @@ const profile = {
       heavy_compound: 180,
       moderate_compound: 120,
       isolation: 60,
+      isometric: 45,
     },
   },
 }
@@ -177,7 +178,18 @@ describe('IndexedDB repositories', () => {
       { id: 'bench-press', technique_note: 'Zatrzymaj ruch przed przeprostem.' },
     ])
     await deleteExercise('bench-press', database)
-    await expect(getExercises(database)).resolves.toEqual([])
+    await expect(getExercises(database)).resolves.toMatchObject([{ id: 'bench-press', active: false }])
+    const customExercise = {
+      ...exercise,
+      id: 'custom-row',
+      name: 'Własne ćwiczenie',
+      custom: true,
+    }
+    await saveExercise(customExercise, database)
+    await deleteExercise('custom-row', database)
+    await expect(getExercises(database)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'custom-row' })]),
+    )
     await saveExercisePreferences(
       { excluded_exercise_ids: ['bench-press'], favorite_exercise_ids: [] },
       database,
@@ -189,6 +201,16 @@ describe('IndexedDB repositories', () => {
     await expect(getPlans(database)).resolves.toEqual([])
     await savePlan(plan, database)
     await expect(getPlans(database)).resolves.toMatchObject([{ id: 'push-a' }])
+    await saveExercise({ ...exercise, id: 'referenced-custom', custom: true }, database)
+    await savePlan({
+      ...plan,
+      id: 'custom-plan',
+      exercises: [{ ...plan.exercises[0], exercise_id: 'referenced-custom' }],
+    }, database)
+    await deleteExercise('referenced-custom', database)
+    await expect(getExercises(database)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'referenced-custom', active: false })]),
+    )
     await savePlan(
       {
         ...plan,

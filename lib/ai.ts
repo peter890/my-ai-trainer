@@ -190,7 +190,7 @@ export async function generateWorkoutPlan(
           name: z.string().trim().min(1).max(120),
           muscle: z.enum(['Klatka', 'Plecy', 'Barki', 'Nogi', 'Ramiona', 'Brzuch', 'Cardio']),
           equipment: z.string().trim().min(1).max(40),
-          restType: z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'cardio']),
+          restType: z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'isometric', 'cardio']),
           techniqueNote: z.string().max(2000),
           favorite: z.boolean(),
           excluded: z.boolean(),

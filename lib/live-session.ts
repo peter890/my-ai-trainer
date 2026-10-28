@@ -36,6 +36,7 @@ const restSecondsByType: Record<RestType, number> = {
   heavy_compound: 180,
   moderate_compound: 120,
   isolation: 60,
+  isometric: 45,
   cardio: 60,
 }
 

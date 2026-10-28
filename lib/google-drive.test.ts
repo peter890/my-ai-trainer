@@ -13,6 +13,7 @@ import {
   readPersistedGoogleDriveToken,
   readDriveSyncQueue,
   syncDriveReplica,
+  trySilentGoogleDriveConnection,
 } from './google-drive'
 
 afterEach(() => {
@@ -136,6 +137,30 @@ describe('google drive helpers', () => {
     expect(storage.getItem(GOOGLE_DRIVE_TOKEN_STORAGE_KEY)).toBeNull()
   })
 
+  it('tries silent authorization without opening a consent prompt', async () => {
+    const storage = createMemoryStorage()
+    const requestAccessToken = vi.fn()
+    const initTokenClient = vi.fn((config: {
+      callback: (response: { access_token: string; expires_in: number }) => void
+    }) => {
+      requestAccessToken.mockImplementation((options?: { prompt?: string }) => {
+        expect(options).toEqual({ prompt: 'none' })
+        config.callback({ access_token: 'silent-token', expires_in: 3600 })
+      })
+      return { requestAccessToken }
+    })
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID', 'test-client-id')
+    vi.stubGlobal('document', {})
+    vi.stubGlobal('window', {
+      localStorage: storage,
+      dispatchEvent: vi.fn(),
+      google: { accounts: { oauth2: { initTokenClient } } },
+    })
+
+    await expect(trySilentGoogleDriveConnection()).resolves.toBe('silent-token')
+    expect(requestAccessToken).toHaveBeenCalledOnce()
+  })
+
   it('queues offline changes and resolves timestamp conflicts deterministically', () => {
     const storage = createMemoryStorage()
 
@@ -230,6 +255,7 @@ describe('google drive helpers', () => {
           heavy_compound: 180,
           moderate_compound: 120,
           isolation: 60,
+          isometric: 45,
         },
       },
     }
@@ -275,6 +301,7 @@ describe('google drive helpers', () => {
           heavy_compound: 180,
           moderate_compound: 120,
           isolation: 60,
+          isometric: 45,
         },
       },
     }
@@ -348,6 +375,7 @@ describe('google drive helpers', () => {
           heavy_compound: 180,
           moderate_compound: 120,
           isolation: 60,
+          isometric: 45,
         },
       },
     }

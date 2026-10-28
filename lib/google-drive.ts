@@ -31,11 +31,12 @@ const DriveReplicaWorkoutsSchema = z
   })
   .strict()
 
-type DriveReplicaSyncResult = {
+export type DriveReplicaSyncResult = {
   status: 'synced' | 'conflict' | 'skipped'
   message: string
 }
 
+export const DRIVE_SYNC_RESULT_EVENT = 'ai-trainer:drive-sync-result'
 export const GOOGLE_DRIVE_FILE_NAMES = {
   profile: 'user_profile.json',
   workouts: 'workouts_history.json',
@@ -44,7 +45,7 @@ export const GOOGLE_DRIVE_FILE_NAMES = {
 const GOOGLE_OAUTH_SCRIPT_URL = 'https://accounts.google.com/gsi/client'
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const DRIVE_TOKEN_EVENT = 'ai-trainer:drive-token-changed'
-const DRIVE_QUEUE_EVENT = 'ai-trainer:drive-queue-changed'
+export const DRIVE_QUEUE_EVENT = 'ai-trainer:drive-queue-changed'
 export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = 'ai-trainer.drive.access-token'
 const GOOGLE_DRIVE_TOKEN_EXPIRY_BUFFER_MS = 60_000
 
@@ -156,7 +157,7 @@ async function ensureGoogleScriptLoaded(): Promise<void> {
   return scriptPromise
 }
 
-export async function connectGoogleDrive(): Promise<string> {
+export async function connectGoogleDrive(prompt: 'consent' | 'none' = 'consent'): Promise<string> {
   ensureBrowser()
 
   const clientId = getGoogleDriveClientId()
@@ -171,7 +172,7 @@ export async function connectGoogleDrive(): Promise<string> {
     throw new Error('Google Identity Services nie jest dostępne w tej przeglądarce.')
   }
 
-  const response = await requestGoogleDriveToken(googleOauth, clientId)
+  const response = await requestGoogleDriveToken(googleOauth, clientId, prompt)
   if (!response.expires_in || !Number.isFinite(response.expires_in) || response.expires_in <= 0) {
     throw new Error('Google nie zwróciło czasu ważności tokena. Połączenie nie zostało zapisane.')
   }
@@ -192,9 +193,22 @@ export async function connectGoogleDrive(): Promise<string> {
   return accessToken
 }
 
+export async function trySilentGoogleDriveConnection(): Promise<string | null> {
+  if (!hasGoogleDriveClientId() || isGoogleDriveConnected()) {
+    return getGoogleDriveAccessToken()
+  }
+
+  try {
+    return await connectGoogleDrive('none')
+  } catch {
+    return null
+  }
+}
+
 function requestGoogleDriveToken(
   googleOauth: NonNullable<NonNullable<Window['google']>['accounts']>['oauth2'],
   clientId: string,
+  prompt: 'consent' | 'none',
 ): Promise<{ access_token: string; expires_in: number }> {
   if (!googleOauth) {
     return Promise.reject(new Error('Google Identity Services nie jest dostępne w tej przeglądarce.'))
@@ -219,7 +233,7 @@ function requestGoogleDriveToken(
       },
     })
 
-    tokenClient.requestAccessToken()
+    tokenClient.requestAccessToken({ prompt })
   })
 }
 

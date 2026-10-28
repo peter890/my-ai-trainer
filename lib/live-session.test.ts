@@ -130,6 +130,7 @@ describe('live session plan resolution', () => {
       heavy_compound: 240,
       moderate_compound: 150,
       isolation: 75,
+      isometric: 45,
     })
 
     expect(exercises[0]?.restSeconds).toBe(240)
