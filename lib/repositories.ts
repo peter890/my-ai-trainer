@@ -24,6 +24,8 @@ import { enqueueDriveSync } from './google-drive'
 
 type Database = IDBPDatabase<TrainerDatabase>
 
+export const EXERCISE_CATALOG_EVENT = 'ai-trainer:exercise-catalog-changed'
+
 async function databaseOrDefault(database?: Database): Promise<Database> {
   return database ?? getDatabase()
 }
@@ -48,12 +50,21 @@ export async function saveExercise(exercise: ExerciseInput, database?: Database)
   const validExercise = ExerciseSchema.parse({ ...exercise, updated_at: new Date().toISOString() })
   const db = await databaseOrDefault(database)
   await db.put('exercises', validExercise)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(EXERCISE_CATALOG_EVENT))
+  }
   return validExercise
 }
 
 export async function getExercises(database?: Database): Promise<Exercise[]> {
   const db = await databaseOrDefault(database)
   return ExerciseSchema.array().parse(await db.getAll('exercises'))
+}
+
+export function subscribeToExerciseCatalog(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(EXERCISE_CATALOG_EVENT, onChange)
+  return () => window.removeEventListener(EXERCISE_CATALOG_EVENT, onChange)
 }
 
 export async function getExercisePreferences(database?: Database): Promise<ExercisePreferences> {

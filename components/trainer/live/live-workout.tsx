@@ -1,42 +1,43 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Flag } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import {useEffect, useRef, useState} from 'react'
+import {ArrowRight, Flag} from 'lucide-react'
+import {Button} from '@/components/ui/button'
 import {
-  getExercisePreferences,
-  getExercises,
-  getLiveSessionSnapshot,
-  getPlans,
-  getProfile,
-  getWorkouts,
-  deleteLiveSessionSnapshot,
-  saveLiveSessionSnapshot,
-  saveWorkout,
+    deleteLiveSessionSnapshot,
+    getExercisePreferences,
+    getExercises,
+    getLiveSessionSnapshot,
+    getPlans,
+    getProfile,
+    getWorkouts,
+    saveLiveSessionSnapshot,
+    saveWorkout,
+    subscribeToExerciseCatalog,
 } from '@/lib/repositories'
 import {
-  buildSessionExercises,
-  buildFreeSessionExercise,
-  getSessionElapsedMs,
-  getSessionRestRemainingMs,
-  prepareInterruptedWorkoutForFinalization,
-  validateSetDraft,
-  type SetDraft,
-  type SessionClockState,
-  type SessionExercise,
+    buildFreeSessionExercise,
+    buildSessionExercises,
+    getSessionElapsedMs,
+    getSessionRestRemainingMs,
+    prepareInterruptedWorkoutForFinalization,
+    type SessionClockState,
+    type SessionExercise,
+    type SetDraft,
+    validateSetDraft,
 } from '@/lib/live-session'
-import type { LoggedSet } from '@/lib/trainer-data'
-import type { CardioMetrics, Exercise, ExercisePreferences, ProfileDocument, Workout, WorkoutMode } from '@/lib/schemas'
-import { getCardioSummary } from '@/lib/cardio'
-import { getExpiredRestSignalEnd, sendRestCompletionSignal } from '@/lib/rest-signal'
-import { LiveWorkoutHeader } from './live-workout-header'
-import { ExerciseCard } from './exercise-card'
-import { SetsTable } from './sets-table'
-import { RestTimer } from './rest-timer'
-import { ExerciseQueue } from './exercise-queue'
-import { CardioMetricsForm } from './cardio-metrics-form'
-import { FreeExercisePicker } from './free-exercise-picker'
-import { useScreenWakeLock } from './use-screen-wake-lock'
+import type {LoggedSet} from '@/lib/trainer-data'
+import type {CardioMetrics, Exercise, ExercisePreferences, ProfileDocument, Workout, WorkoutMode} from '@/lib/schemas'
+import {getCardioSummary} from '@/lib/cardio'
+import {getExpiredRestSignalEnd, sendRestCompletionSignal} from '@/lib/rest-signal'
+import {LiveWorkoutHeader} from './live-workout-header'
+import {ExerciseCard} from './exercise-card'
+import {SetsTable} from './sets-table'
+import {RestTimer} from './rest-timer'
+import {ExerciseQueue} from './exercise-queue'
+import {CardioMetricsForm} from './cardio-metrics-form'
+import {FreeExercisePicker} from './free-exercise-picker'
+import {useScreenWakeLock} from './use-screen-wake-lock'
 
 type LiveWorkoutProps = {
   planId: string
@@ -224,6 +225,18 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
       active = false
     }
   }, [mode, planId])
+
+  useEffect(() => {
+      return subscribeToExerciseCatalog(() => {
+        void getExercises()
+            .then(setAvailableExercises)
+            .catch((cause: unknown) => {
+                setPersistenceError(
+                    cause instanceof Error ? cause.message : 'Nie udało się odświeżyć katalogu ćwiczeń.',
+                )
+            })
+    })
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 250)

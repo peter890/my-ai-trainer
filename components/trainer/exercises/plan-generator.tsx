@@ -33,6 +33,12 @@ const levelToAiLevel = {
 } as const
 
 type PlanDay = { name: string; exercises: (Exercise & { scheme: string })[] }
+type GeneratedPlanSettings = {
+  goal: (typeof goals)[number]
+  level: (typeof levels)[number]
+  days: number
+  length: number
+}
 
 export function PlanGenerator({
   exercises,
@@ -51,10 +57,12 @@ export function PlanGenerator({
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [plansRevision, setPlansRevision] = useState(0)
+  const [generatedSettings, setGeneratedSettings] = useState<GeneratedPlanSettings | null>(null)
 
   const generate = async () => {
     setLoading(true)
     setPlan(null)
+    setGeneratedSettings(null)
     setError('')
     setMessage('')
     const pool = filterExercisesForPlan(exercises, skipExcluded)
@@ -105,6 +113,7 @@ export function PlanGenerator({
       }
 
       setPlan(nextPlan)
+      setGeneratedSettings({ goal, level, days, length })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Nie udało się wygenerować planu AI.')
     } finally {
@@ -232,9 +241,9 @@ export function PlanGenerator({
           <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <p className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">
-                {goal} · {level}
+                {generatedSettings?.goal} · {generatedSettings?.level}
               </span>{' '}
-              — {days} dni × {length} min
+              — {generatedSettings?.days} dni × {generatedSettings?.length} min
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               {plan.map((day, i) => (
