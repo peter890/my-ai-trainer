@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Check, Pencil } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -25,18 +26,10 @@ const goalOptions: { value: PrimaryGoal; label: string }[] = [
   { value: 'endurance', label: 'Wytrzymałość' },
 ]
 
-function bmiCategory(bmi: number) {
-  if (bmi < 18.5) return 'Niedowaga'
-  if (bmi < 25) return 'Prawidłowa'
-  if (bmi < 30) return 'Nadwaga'
-  return 'Otyłość'
-}
-
 type BiometricsCardProps = {
   gender: Gender
   age: number
   height: number
-  weight: number
   experienceLevel: ExperienceLevel
   primaryGoal: PrimaryGoal
   injuriesNotes: string
@@ -52,7 +45,6 @@ export function BiometricsCard({
   gender,
   age,
   height,
-  weight,
   experienceLevel,
   primaryGoal,
   injuriesNotes,
@@ -63,10 +55,9 @@ export function BiometricsCard({
   onPrimaryGoalChange,
   onInjuriesNotesChange,
 }: BiometricsCardProps) {
-  const h = height / 100
-  const bmi = h > 0 ? weight / (h * h) : 0
   const [ageDraft, setAgeDraft] = useState(String(age))
   const [heightDraft, setHeightDraft] = useState(String(height))
+  const [editingStaticData, setEditingStaticData] = useState(false)
 
   const commitAge = () => {
     const parsed = Number(ageDraft)
@@ -90,22 +81,34 @@ export function BiometricsCard({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="font-semibold">Dane biometryczne</CardTitle>
-        <CardDescription>Wykorzystywane do kalibracji obciążeń i analiz AI.</CardDescription>
-      </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <fieldset>
-          <legend className="mb-2 text-sm font-medium">Płeć</legend>
+          <div className="mb-2 flex items-center justify-between">
+            <legend className="text-sm font-medium">Płeć</legend>
+            <button
+              type="button"
+              onClick={() => setEditingStaticData((current) => !current)}
+              aria-label={editingStaticData ? 'Zakończ edycję płci, wieku i wzrostu' : 'Edytuj płeć, wiek i wzrost'}
+              title={editingStaticData ? 'Zakończ edycję' : 'Edytuj dane podstawowe'}
+              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              {editingStaticData ? (
+                <Check className="size-4 text-primary" aria-hidden="true" />
+              ) : (
+                <Pencil className="size-4" aria-hidden="true" />
+              )}
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/60 p-1">
             {genderOptions.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => onGenderChange(value)}
+                disabled={!editingStaticData}
                 aria-pressed={gender === value}
                 className={cn(
-                  'h-10 rounded-lg text-sm font-medium transition-colors',
+                  'h-10 rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                   gender === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -116,7 +119,15 @@ export function BiometricsCard({
         </fieldset>
 
         <div className="grid grid-cols-3 gap-3">
-          <Field id="age" label="Wiek" unit="lat" value={ageDraft} onChange={setAgeDraft} onBlur={commitAge} />
+          <Field
+            id="age"
+            label="Wiek"
+            unit="lat"
+            value={ageDraft}
+            onChange={setAgeDraft}
+            onBlur={commitAge}
+            readOnly={!editingStaticData}
+          />
           <Field
             id="height"
             label="Wzrost"
@@ -124,8 +135,8 @@ export function BiometricsCard({
             value={heightDraft}
             onChange={setHeightDraft}
             onBlur={commitHeight}
+            readOnly={!editingStaticData}
           />
-          <Field id="weight" label="Waga" unit="kg" value={weight.toLocaleString('pl-PL')} readOnly />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -158,13 +169,6 @@ export function BiometricsCard({
           <p className="text-xs text-muted-foreground">{injuriesNotes.length}/4000</p>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl bg-secondary/40 p-4">
-          <div>
-            <p className="text-xs text-muted-foreground">BMI</p>
-            <p className="text-2xl font-semibold tabular-nums">{bmi.toLocaleString('pl-PL', { maximumFractionDigits: 1 })}</p>
-          </div>
-          <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-medium text-primary">{bmiCategory(bmi)}</span>
-        </div>
       </CardContent>
     </Card>
   )

@@ -9,6 +9,7 @@ import { AiProviderCard } from './ai-provider-card'
 import { DriveSyncCard } from './drive-sync-card'
 import { BackupCard } from './backup-card'
 import { RestSettingsCard } from './rest-settings-card'
+import { ProfileSection } from './profile-section'
 
 const defaultProfileDocument: ProfileDocument = {
   version: '1.0',
@@ -262,13 +263,16 @@ export function ProfileView() {
         <p className="mt-1 text-sm text-muted-foreground">Dane biometryczne, integracja AI i synchronizacja.</p>
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2 lg:gap-6">
-        <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <ProfileSection
+          title="Dane biometryczne"
+          description="Płeć, wiek, wzrost i dane używane do dopasowania treningu."
+          defaultOpen
+        >
           <BiometricsCard
             gender={profile.profile.gender}
             age={profile.profile.age}
             height={profile.profile.height_cm}
-            weight={currentWeight}
             experienceLevel={profile.profile.experience_level}
             primaryGoal={profile.profile.primary_goal}
             injuriesNotes={profile.profile.injuries_notes}
@@ -279,25 +283,46 @@ export function ProfileView() {
             onPrimaryGoalChange={handlePrimaryGoalChange}
             onInjuriesNotesChange={handleInjuriesNotesChange}
           />
+        </ProfileSection>
+        <ProfileSection
+          title="Masa ciała i postępy"
+          description="Dodawaj pomiary i obserwuj zmianę w czasie."
+          defaultOpen
+        >
+          <WeightHistoryCard weights={weights} onAdd={addWeight} />
+        </ProfileSection>
+        <ProfileSection
+          title="Ustawienia treningu"
+          description="Domyślne przerwy i sygnał końca odpoczynku."
+        >
           <RestSettingsCard
             values={profile.settings.rest_timer_defaults}
             onChange={handleRestTimerChange}
             signal={profile.settings.rest_timer_signal}
             onSignalChange={handleRestTimerSignalChange}
           />
+        </ProfileSection>
+        <ProfileSection
+          title="Sztuczna inteligencja"
+          description="Dostawca AI i lokalny klucz API."
+        >
           <AiProviderCard />
-        </div>
-        <div className="flex flex-col gap-4">
-          <WeightHistoryCard weights={weights} onAdd={addWeight} />
-          <DriveSyncCard />
-        </div>
+        </ProfileSection>
+        <ProfileSection
+          title="Synchronizacja i dane"
+          description="Google Drive, import, eksport i usuwanie danych."
+        >
+          <div className="flex flex-col gap-3">
+            <DriveSyncCard />
+            <BackupCard />
+          </div>
+        </ProfileSection>
       </div>
       {saveError ? (
         <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           Nie udało się zapisać zmian profilu: {saveError}
         </p>
       ) : null}
-      <BackupCard />
     </div>
   )
 }

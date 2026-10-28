@@ -162,15 +162,22 @@ export function ExerciseCatalog({
               <li
                 key={e.id}
                 className={cn(
-                  'flex flex-col gap-2 rounded-xl border border-border bg-secondary/30 p-3 transition-colors',
+                  'flex flex-col gap-1.5 rounded-xl border border-border bg-secondary/30 p-3 transition-colors',
                   e.excluded && 'opacity-55',
                   !e.active && 'opacity-50',
                   e.favorite && 'border-primary/30',
                 )}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-1.5">
                   <div className="min-w-0 flex-1">
-                    <p className={cn('truncate text-sm font-medium', (e.excluded || !e.active) && 'line-through')}>{e.name}</p>
+                    <p
+                      className={cn(
+                        'whitespace-normal break-words text-sm font-medium [overflow-wrap:anywhere]',
+                        (e.excluded || !e.active) && 'line-through',
+                      )}
+                    >
+                      {e.name}
+                    </p>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                       {e.muscle} · {e.equipment}
                       {e.custom && (
@@ -180,59 +187,61 @@ export function ExerciseCatalog({
                       )}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onToggleActive(e.id)}
-                    aria-pressed={e.active}
-                    aria-label={`${e.active ? 'Dezaktywuj' : 'Aktywuj'} ćwiczenie: ${e.name}`}
-                    className={cn(
-                      'flex size-10 items-center justify-center rounded-lg transition-colors',
-                      e.active ? 'text-emerald-400 hover:bg-secondary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                    )}
-                  >
-                    {e.active ? (
-                      <CircleCheck className="size-5" aria-hidden="true" />
-                    ) : (
-                      <CircleX className="size-5" aria-hidden="true" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggle(e.id, 'favorite')}
-                    aria-pressed={e.favorite}
-                    aria-label={`${e.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}: ${e.name}`}
-                    className={cn(
-                      'flex size-10 items-center justify-center rounded-lg transition-colors',
-                      e.favorite ? 'text-warning' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                    )}
-                  >
-                    <Star className={cn('size-5', e.favorite && 'fill-current')} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggle(e.id, 'excluded')}
-                    aria-pressed={e.excluded}
-                    aria-label={`${e.excluded ? 'Przywróć' : 'Wyklucz'}: ${e.name}`}
-                    className={cn(
-                      'flex size-10 items-center justify-center rounded-lg transition-colors',
-                      e.excluded
-                        ? 'bg-destructive/15 text-destructive'
-                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                    )}
-                  >
-                    <Ban className="size-5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingNoteId(e.id)
-                      setNoteDraft(e.techniqueNote)
-                    }}
-                    aria-label={`Edytuj notatkę techniczną: ${e.name}`}
-                    className="flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  >
-                    <Pencil className="size-4" aria-hidden="true" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-2 self-end">
+                    <button
+                      type="button"
+                      onClick={() => onToggleActive(e.id)}
+                      aria-pressed={e.active}
+                      aria-label={`${e.active ? 'Dezaktywuj' : 'Aktywuj'} ćwiczenie: ${e.name}`}
+                      className={cn(
+                        'flex size-10 items-center justify-center rounded-lg transition-colors',
+                        e.active ? 'text-emerald-400 hover:bg-secondary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                      )}
+                    >
+                      {e.active ? (
+                        <CircleCheck className="size-5" aria-hidden="true" />
+                      ) : (
+                        <CircleX className="size-5" aria-hidden="true" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggle(e.id, 'favorite')}
+                      aria-pressed={e.favorite}
+                      aria-label={`${e.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}: ${e.name}`}
+                      className={cn(
+                        'flex size-10 items-center justify-center rounded-lg transition-colors',
+                        e.favorite ? 'text-warning' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                      )}
+                    >
+                      <Star className={cn('size-5', e.favorite && 'fill-current')} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onToggle(e.id, 'excluded')}
+                      aria-pressed={e.excluded}
+                      aria-label={`${e.excluded ? 'Przywróć' : 'Wyklucz'}: ${e.name}`}
+                      className={cn(
+                        'flex size-10 items-center justify-center rounded-lg transition-colors',
+                        e.excluded
+                          ? 'bg-destructive/15 text-destructive'
+                          : 'text-destructive/70 hover:bg-destructive/10 hover:text-destructive',
+                      )}
+                    >
+                      <Ban className="size-5" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingNoteId(e.id)
+                        setNoteDraft(e.techniqueNote)
+                      }}
+                      aria-label={`Edytuj notatkę techniczną: ${e.name}`}
+                      className="flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      <Pencil className="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
                 {editingNoteId === e.id ? (
                   <div className="flex flex-col gap-2">
