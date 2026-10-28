@@ -246,5 +246,45 @@
     "equipment": "calisthenics",
     "rest_type": "moderate_compound",
     "technique_note": "Utrzymuj ciało w jednej linii, napnij brzuch i pośladki, opuszczaj klatkę piersiową blisko podłogi."
+  },
+  {
+    "id": "stationary-bike",
+    "name": "Rowerek stacjonarny",
+    "category": "cardio",
+    "equipment": "machine",
+    "rest_type": "cardio",
+    "technique_note": "Ustaw wysokość siodełka tak, aby w dolnym punkcie obrotu noga była lekko ugięta w kolanie, i dobierz opór do planowanej intensywności."
+  },
+  {
+    "id": "elliptical",
+    "name": "Orbitrek (Maszyna eliptyczna)",
+    "category": "cardio",
+    "equipment": "machine",
+    "rest_type": "cardio",
+    "technique_note": "Ruch powinien być płynny, z pełnym naciskiem stóp na pedały, angażując zarówno nogi, jak i ramiona poprzez ruch uchwytów."
+  },
+  {
+    "id": "farmer-walk",
+    "name": "Spacer farmera",
+    "category": "legs",
+    "equipment": "dumbbell",
+    "rest_type": "heavy_compound",
+    "technique_note": "Chwyć ciężkie hantle lub odważniki, ściągnij łopatki, utrzymaj wyprostowaną sylwetkę i stawiaj stabilne, kontrolowane kroki."
+  },
+  {
+    "id": "seated-row",
+    "name": "Wiosłowanie siedząc na maszynie / wyciągu",
+    "category": "back",
+    "equipment": "machine",
+    "rest_type": "moderate_compound",
+    "technique_note": "Oprzyj klatkę o podparcie (jeśli maszyna je posiada), przyciągaj uchwyt w okolice pępka, ściągając łopatki i nie bujając tułowiem."
+  },
+  {
+    "id": "stairs",
+    "name": "Schody treningowe / Stepper schodkowy",
+    "category": "cardio",
+    "equipment": "machine",
+    "rest_type": "cardio",
+    "technique_note": "Utrzymuj wyprostowaną sylwetkę, nie opieraj się całym ciężarem ciała na poręczach i stawiaj całą stopę na stopniu."
   }
 ]
