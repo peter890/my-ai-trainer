@@ -267,7 +267,6 @@ export function ProfileView() {
         <ProfileSection
           title="Dane biometryczne"
           description="Płeć, wiek, wzrost i dane używane do dopasowania treningu."
-          defaultOpen
         >
           <BiometricsCard
             gender={profile.profile.gender}
@@ -287,7 +286,6 @@ export function ProfileView() {
         <ProfileSection
           title="Masa ciała i postępy"
           description="Dodawaj pomiary i obserwuj zmianę w czasie."
-          defaultOpen
         >
           <WeightHistoryCard weights={weights} onAdd={addWeight} />
         </ProfileSection>

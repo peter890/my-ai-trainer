@@ -30,7 +30,7 @@ export function ProfileSection({ title, description, defaultOpen = false, childr
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
       {open ? (
-        <div id={contentId} className="mt-2 border-l-2 border-primary/35 pl-2">
+        <div id={contentId} className="mt-2">
           {children}
         </div>
       ) : null}
