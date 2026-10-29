@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getProfile, saveProfile } from '@/lib/repositories'
+import { getProfile, PROFILE_DATA_EVENT, saveProfile } from '@/lib/repositories'
 import type { ExperienceLevel, Gender, PrimaryGoal, ProfileDocument } from '@/lib/schemas'
 import { BiometricsCard } from './biometrics-card'
 import { WeightHistoryCard } from './weight-history-card'
@@ -94,6 +94,15 @@ export function ProfileView() {
     return () => {
       active = false
     }
+  }, [])
+
+  useEffect(() => {
+    const handleProfileDataChange = () => {
+      void loadProfile()
+    }
+
+    window.addEventListener(PROFILE_DATA_EVENT, handleProfileDataChange)
+    return () => window.removeEventListener(PROFILE_DATA_EVENT, handleProfileDataChange)
   }, [])
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import {z} from 'zod'
-import { ProfileDocumentSchema, WorkoutSchema } from './schemas'
+import { ProfileDocumentSchema, WorkoutSchema, type ProfileDocument, type Workout } from './schemas'
 
 export const GoogleDriveSyncStatusSchema = z.enum(['idle', 'connecting', 'connected', 'error'])
 export type GoogleDriveSyncStatus = z.infer<typeof GoogleDriveSyncStatusSchema>
@@ -332,6 +332,26 @@ export async function readGoogleDriveJsonFile(fileName: string): Promise<unknown
   }
 
   return readDriveFileJson(file)
+}
+
+export async function readProfileReplicaFromDrive(): Promise<ProfileDocument | undefined> {
+  const files = await listGoogleDriveAppDataFiles()
+  const remote = await readRemoteReplica(
+    getNewestDriveFile(files, GOOGLE_DRIVE_FILE_NAMES.profile),
+    ProfileDocumentSchema,
+    DriveReplicaProfileSchema,
+  )
+  return remote?.data
+}
+
+export async function readWorkoutsReplicaFromDrive(): Promise<Workout[] | undefined> {
+  const files = await listGoogleDriveAppDataFiles()
+  const remote = await readRemoteReplica(
+    getNewestDriveFile(files, GOOGLE_DRIVE_FILE_NAMES.workouts),
+    WorkoutSchema.array(),
+    DriveReplicaWorkoutsSchema,
+  )
+  return remote?.data
 }
 
 async function readDriveFileJson(file: GoogleDriveFile): Promise<unknown> {

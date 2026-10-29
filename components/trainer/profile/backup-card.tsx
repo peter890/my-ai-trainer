@@ -54,7 +54,11 @@ export function BackupCard() {
     try {
       const backup = parseTrainerBackupJson(await file.text())
       const result = await importTrainerBackup(backup)
-      setMessage('Dane z kopii zostały scalone z danymi lokalnymi. Nowsze rekordy zachowano według znacznika czasu.')
+      setMessage(
+        backup.data.profile
+          ? 'Dane z kopii zostały scalone z danymi lokalnymi. Nowsze rekordy zachowano według znacznika czasu.'
+          : 'Katalog ćwiczeń został zaimportowany. Profil i historia treningów nie były częścią tego pliku.',
+      )
       setWarning(result.syncQueueWarning ?? '')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Nie udało się zaimportować kopii zapasowej.')

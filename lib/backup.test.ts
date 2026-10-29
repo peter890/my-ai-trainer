@@ -107,6 +107,17 @@ describe('trainer backup', () => {
     ).toThrow('nie mogą się powtarzać')
   })
 
+  it('accepts a standalone exercise catalog as a partial backup', () => {
+    const backup = parseTrainerBackupJson(
+      JSON.stringify([createExercise('catalog-exercise', importTimestamp)]),
+    )
+
+    expect(backup.data.exercises).toHaveLength(1)
+    expect(backup.data.exercises[0]?.id).toBe('catalog-exercise')
+    expect(backup.data.profile).toBeUndefined()
+    expect(backup.data.workouts).toEqual([])
+  })
+
   it('merges records by ID using updated_at and keeps local data on timestamp ties', () => {
     const local = {
       profile: createProfile(localTimestamp, 70),

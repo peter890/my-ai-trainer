@@ -25,6 +25,7 @@ import { enqueueDriveSync } from './google-drive'
 type Database = IDBPDatabase<TrainerDatabase>
 
 export const EXERCISE_CATALOG_EVENT = 'ai-trainer:exercise-catalog-changed'
+export const PROFILE_DATA_EVENT = 'ai-trainer:profile-data-changed'
 
 async function databaseOrDefault(database?: Database): Promise<Database> {
   return database ?? getDatabase()
@@ -37,6 +38,15 @@ export async function saveProfile(profile: ProfileDocumentInput, database?: Data
 
   if (typeof window !== 'undefined') {
     enqueueDriveSync('profile', validProfile)
+  }
+}
+
+export async function importProfile(profile: ProfileDocumentInput, database?: Database): Promise<void> {
+  const validProfile = ProfileDocumentSchema.parse(profile)
+  const db = await databaseOrDefault(database)
+  await db.put('profile', validProfile, 'current')
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(PROFILE_DATA_EVENT))
   }
 }
 
@@ -144,6 +154,14 @@ export async function saveWorkout(workout: WorkoutInput, database?: Database): P
   if (typeof window !== 'undefined') {
     enqueueDriveSync('workouts', validWorkout)
   }
+}
+
+export async function importWorkouts(workouts: WorkoutInput[], database?: Database): Promise<void> {
+  const validWorkouts = WorkoutSchema.array().parse(workouts)
+  const db = await databaseOrDefault(database)
+  const transaction = db.transaction('workouts', 'readwrite')
+  await transaction.store.clear()
+  await Promise.all([...validWorkouts.map((workout) => transaction.store.put(workout)), transaction.done])
 }
 
 export async function getWorkout(id: string, database?: Database): Promise<Workout | undefined> {

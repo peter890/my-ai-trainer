@@ -235,7 +235,7 @@ export async function importTrainerBackup(
   if (typeof window !== 'undefined') {
     try {
       if (merged.profile) enqueueDriveSync('profile', merged.profile)
-      enqueueDriveSync('workouts', merged.workouts)
+      if (merged.workouts.length > 0) enqueueDriveSync('workouts', merged.workouts)
     } catch (cause) {
       syncQueueWarning =
         cause instanceof Error
@@ -274,7 +274,25 @@ export function parseTrainerBackupJson(json: string): TrainerBackup {
   } catch {
     throw new Error('Plik kopii zapasowej nie zawiera poprawnego JSON.')
   }
-  return TrainerBackupSchema.parse(parsed)
+
+  const fullBackup = TrainerBackupSchema.safeParse(parsed)
+  if (fullBackup.success) return fullBackup.data
+
+  const exerciseCatalog = ExerciseSchema.array().safeParse(parsed)
+  if (exerciseCatalog.success) {
+    return TrainerBackupSchema.parse({
+      format: 'ai-trainer-backup',
+      version: '1.0',
+      exported_at: new Date().toISOString(),
+      data: {
+        exercises: exerciseCatalog.data,
+        plans: [],
+        workouts: [],
+      },
+    })
+  }
+
+  throw fullBackup.error
 }
 
 export function getBackupDownloadName(exportedAt: string): string {

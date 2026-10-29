@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Cloud, CloudOff, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Cloud, CloudOff, Download, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   connectGoogleDrive,
@@ -12,11 +12,13 @@ import {
   getDriveSyncQueueLength,
   hasGoogleDriveClientId,
   isGoogleDriveConnected,
+  readProfileReplicaFromDrive,
+  readWorkoutsReplicaFromDrive,
   subscribeToDriveSyncQueue,
   subscribeToGoogleDriveToken,
   syncDriveReplica,
 } from '@/lib/google-drive'
-import { getProfile, getWorkouts } from '@/lib/repositories'
+import { getProfile, getWorkouts, importProfile, importWorkouts } from '@/lib/repositories'
 import { cn } from '@/lib/utils'
 
 export function DriveSyncCard() {
@@ -28,6 +30,7 @@ export function DriveSyncCard() {
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [clearError, setClearError] = useState('')
+  const [conflictEntity, setConflictEntity] = useState<'profile' | 'workouts' | null>(null)
 
   useEffect(() => {
     const syncState = () => {
@@ -55,7 +58,7 @@ export function DriveSyncCard() {
       }
     })
     const handleAutomaticSync = (event: Event) => {
-      const result = (event as CustomEvent<{ status: string; message: string }>).detail
+      const result = (event as CustomEvent<{ status: string; message: string; entity?: 'profile' | 'workouts' }>).detail
       if (!result) return
 
       setQueueLength(getDriveSyncQueueLength())
@@ -66,6 +69,7 @@ export function DriveSyncCard() {
       } else if (result.status === 'conflict' || result.status === 'error') {
         setStatus('error')
         setError(result.message)
+        setConflictEntity(result.status === 'conflict' ? result.entity ?? null : null)
       }
     }
     window.addEventListener(DRIVE_SYNC_RESULT_EVENT, handleAutomaticSync)
@@ -122,10 +126,40 @@ export function DriveSyncCard() {
       setQueueLength(getDriveSyncQueueLength())
       setMessage(result.message)
       setError(result.status === 'conflict' ? result.message : '')
+      setConflictEntity(result.status === 'conflict' ? result.entity ?? null : null)
     } catch (cause) {
       setStatus('error')
       setError(cause instanceof Error ? cause.message : 'Nie udało się zsynchronizować danych z Google Drive.')
       setMessage('Synchronizacja zakończyła się błędem.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleImportConflict = async () => {
+    if (!conflictEntity || !isGoogleDriveConnected()) return
+
+    setSyncing(true)
+    setError('')
+    setMessage('Importowanie kopii z Google Drive…')
+
+    try {
+      if (conflictEntity === 'profile') {
+        const profile = await readProfileReplicaFromDrive()
+        if (!profile) throw new Error('Nie znaleziono profilu do zaimportowania w Google Drive.')
+        await importProfile(profile)
+      } else {
+        const workouts = await readWorkoutsReplicaFromDrive()
+        if (!workouts) throw new Error('Nie znaleziono historii treningów do zaimportowania w Google Drive.')
+        await importWorkouts(workouts)
+      }
+
+      setConflictEntity(null)
+      await handleSyncNow()
+    } catch (cause) {
+      setStatus('error')
+      setError(cause instanceof Error ? cause.message : 'Nie udało się zaimportować kopii z Google Drive.')
+      setMessage('Importowanie zakończyło się błędem.')
     } finally {
       setSyncing(false)
     }
@@ -269,6 +303,24 @@ export function DriveSyncCard() {
             <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
               {error}
             </p>
+          ) : null}
+          {conflictEntity ? (
+            <button
+              type="button"
+              onClick={() => void handleImportConflict()}
+              disabled={syncing}
+              className={cn(
+                'flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-medium text-amber-200 hover:bg-amber-500/15',
+                syncing && 'cursor-wait opacity-70',
+              )}
+            >
+              {syncing ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
+              {syncing
+                ? 'Importowanie…'
+                : conflictEntity === 'profile'
+                  ? 'Importuj profil z Google Drive'
+                  : 'Importuj historię treningów z Google Drive'}
+            </button>
           ) : null}
         </div>
 
