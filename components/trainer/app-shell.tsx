@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { getWorkouts } from '@/lib/repositories'
+import { getProfile, getWorkouts } from '@/lib/repositories'
 import type { WorkoutMode } from '@/lib/schemas'
 import type { TabId } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
@@ -21,6 +21,7 @@ export function AppShell() {
   const [hasUnfinalized, setHasUnfinalized] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState('')
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('planned')
+  const [profileRequired, setProfileRequired] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -54,7 +55,25 @@ export function AppShell() {
     window.scrollTo({ top: 0 })
   }
 
-  const startWorkout = (planId: string) => {
+  const startWorkout = async (planId: string) => {
+    try {
+      const profile = await getProfile()
+      if (profile?.profile.age === undefined || profile.profile.height_cm === undefined) {
+        setProfileRequired(true)
+        setTab('profile')
+        setLiveVisible(false)
+        window.scrollTo({ top: 0 })
+        return
+      }
+    } catch {
+      setProfileRequired(true)
+      setTab('profile')
+      setLiveVisible(false)
+      window.scrollTo({ top: 0 })
+      return
+    }
+
+    setProfileRequired(false)
     setSelectedPlanId(planId)
     setWorkoutMode('planned')
     setLiveActive(true)
@@ -133,7 +152,7 @@ export function AppShell() {
               )}
               {tab === 'history' && <HistoryView />}
               {tab === 'exercises' && <ExercisesView />}
-              {tab === 'profile' && <ProfileView />}
+              {tab === 'profile' && <ProfileView required={profileRequired} />}
             </div>
           )}
         </main>

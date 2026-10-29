@@ -16,19 +16,7 @@ const defaultProfileDocument: ProfileDocument = {
   updated_at: '2026-10-14T18:30:00.000Z',
   profile: {
     gender: 'male',
-    age: 29,
-    height_cm: 182,
-    weight_history: [
-      { date: '2026-08-17', weight_kg: 85.1 },
-      { date: '2026-08-24', weight_kg: 84.8 },
-      { date: '2026-08-31', weight_kg: 84.6 },
-      { date: '2026-09-07', weight_kg: 84.1 },
-      { date: '2026-09-14', weight_kg: 83.9 },
-      { date: '2026-09-21', weight_kg: 83.4 },
-      { date: '2026-09-28', weight_kg: 83.2 },
-      { date: '2026-10-05', weight_kg: 82.8 },
-      { date: '2026-10-12', weight_kg: 82.4 },
-    ],
+    weight_history: [],
     experience_level: 'intermediate',
     primary_goal: 'hypertrophy',
     injuries_notes: '',
@@ -58,8 +46,9 @@ function formatDisplayDate(date: string) {
   return parsed.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })
 }
 
-export function ProfileView() {
+export function ProfileView({ required = false }: { required?: boolean }) {
   const [profile, setProfile] = useState<ProfileDocument>(defaultProfileDocument)
+  const [profileDirty, setProfileDirty] = useState(false)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
   const [saveError, setSaveError] = useState('')
@@ -71,6 +60,7 @@ export function ProfileView() {
     try {
       const document = await getProfile()
       setProfile(document ?? defaultProfileDocument)
+      setProfileDirty(false)
       setStatus('ready')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Nie udało się wczytać profilu.')
@@ -84,6 +74,7 @@ export function ProfileView() {
     void getProfile().then((document) => {
       if (!active) return
       setProfile(document ?? defaultProfileDocument)
+      setProfileDirty(false)
       setStatus('ready')
     }).catch((cause: unknown) => {
       if (!active) return
@@ -106,7 +97,7 @@ export function ProfileView() {
   }, [])
 
   useEffect(() => {
-    if (status !== 'ready') return
+    if (status !== 'ready' || !profileDirty) return
 
     let active = true
     const timeout = window.setTimeout(() => {
@@ -114,7 +105,10 @@ export function ProfileView() {
         ...profile,
         updated_at: new Date().toISOString(),
       }).then(() => {
-        if (active) setSaveError('')
+        if (active) {
+          setSaveError('')
+          setProfileDirty(false)
+        }
       }).catch((cause: unknown) => {
         if (active) {
           setSaveError(cause instanceof Error ? cause.message : 'Nie udało się zapisać profilu.')
@@ -126,7 +120,12 @@ export function ProfileView() {
       active = false
       window.clearTimeout(timeout)
     }
-  }, [profile, status])
+  }, [profile, profileDirty, status])
+
+  const updateProfile = (updater: (current: ProfileDocument) => ProfileDocument) => {
+    setProfile(updater)
+    setProfileDirty(true)
+  }
 
   const currentWeight = profile.profile.weight_history.at(-1)?.weight_kg ?? 0
   const weights = profile.profile.weight_history.map((entry) => ({
@@ -135,7 +134,7 @@ export function ProfileView() {
   }))
 
   const addWeight = (weight: number) => {
-    setProfile((current) => {
+    updateProfile((current) => {
       const nextHistory = [
         ...current.profile.weight_history,
         {
@@ -156,7 +155,7 @@ export function ProfileView() {
   }
 
   const handleGenderChange = (gender: Gender) => {
-    setProfile((current) => ({
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       profile: {
@@ -166,30 +165,30 @@ export function ProfileView() {
     }))
   }
 
-  const handleAgeChange = (age: number) => {
-    setProfile((current) => ({
+  const handleAgeChange = (age: number | undefined) => {
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       profile: {
         ...current.profile,
-        age: Number.isFinite(age) ? Math.min(Math.max(age, 13), 120) : current.profile.age,
+        ...(age === undefined ? { age: undefined } : { age: Math.min(Math.max(age, 13), 120) }),
       },
     }))
   }
 
-  const handleHeightChange = (height: number) => {
-    setProfile((current) => ({
+  const handleHeightChange = (height: number | undefined) => {
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       profile: {
         ...current.profile,
-        height_cm: Number.isFinite(height) ? Math.min(Math.max(height, 1), 300) : current.profile.height_cm,
+        ...(height === undefined ? { height_cm: undefined } : { height_cm: Math.min(Math.max(height, 1), 300) }),
       },
     }))
   }
 
   const handleExperienceLevelChange = (experienceLevel: ExperienceLevel) => {
-    setProfile((current) => ({
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       profile: { ...current.profile, experience_level: experienceLevel },
@@ -197,7 +196,7 @@ export function ProfileView() {
   }
 
   const handlePrimaryGoalChange = (primaryGoal: PrimaryGoal) => {
-    setProfile((current) => ({
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       profile: { ...current.profile, primary_goal: primaryGoal },
@@ -205,7 +204,7 @@ export function ProfileView() {
   }
 
   const handleInjuriesNotesChange = (injuriesNotes: string) => {
-    setProfile((current) => ({
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       profile: { ...current.profile, injuries_notes: injuriesNotes },
@@ -213,7 +212,7 @@ export function ProfileView() {
   }
 
   const handleRestTimerChange = (key: keyof ProfileDocument['settings']['rest_timer_defaults'], seconds: number) => {
-    setProfile((current) => ({
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       settings: {
@@ -227,7 +226,7 @@ export function ProfileView() {
   }
 
   const handleRestTimerSignalChange = (signal: ProfileDocument['settings']['rest_timer_signal']) => {
-    setProfile((current) => ({
+    updateProfile((current) => ({
       ...current,
       updated_at: new Date().toISOString(),
       settings: { ...current.settings, rest_timer_signal: signal },
@@ -274,9 +273,15 @@ export function ProfileView() {
       </div>
 
       <div className="flex flex-col gap-3">
+        {required ? (
+          <p role="alert" className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+            Uzupełnij wiek i wzrost przed rozpoczęciem treningu planowanego. Pozostałe funkcje aplikacji pozostają dostępne.
+          </p>
+        ) : null}
         <ProfileSection
           title="Dane biometryczne"
           description="Płeć, wiek, wzrost i dane używane do dopasowania treningu."
+          defaultOpen={required}
         >
           <BiometricsCard
             gender={profile.profile.gender}

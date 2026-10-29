@@ -28,14 +28,14 @@ const goalOptions: { value: PrimaryGoal; label: string }[] = [
 
 type BiometricsCardProps = {
   gender: Gender
-  age: number
-  height: number
+  age?: number
+  height?: number
   experienceLevel: ExperienceLevel
   primaryGoal: PrimaryGoal
   injuriesNotes: string
   onGenderChange: (value: Gender) => void
-  onAgeChange: (value: number) => void
-  onHeightChange: (value: number) => void
+  onAgeChange: (value: number | undefined) => void
+  onHeightChange: (value: number | undefined) => void
   onExperienceLevelChange: (value: ExperienceLevel) => void
   onPrimaryGoalChange: (value: PrimaryGoal) => void
   onInjuriesNotesChange: (value: string) => void
@@ -55,8 +55,8 @@ export function BiometricsCard({
   onPrimaryGoalChange,
   onInjuriesNotesChange,
 }: BiometricsCardProps) {
-  const [ageDraft, setAgeDraft] = useState(String(age))
-  const [heightDraft, setHeightDraft] = useState(String(height))
+  const [ageDraft, setAgeDraft] = useState(age === undefined ? '' : String(age))
+  const [heightDraft, setHeightDraft] = useState(height === undefined ? '' : String(height))
   const [editingStaticData, setEditingStaticData] = useState(false)
 
   const commitAge = () => {
@@ -64,8 +64,10 @@ export function BiometricsCard({
     if (Number.isFinite(parsed) && parsed >= 13 && parsed <= 120) {
       onAgeChange(parsed)
       setAgeDraft(String(parsed))
+    } else if (ageDraft.trim() === '') {
+      onAgeChange(undefined)
     } else {
-      setAgeDraft(String(age))
+      setAgeDraft(age === undefined ? '' : String(age))
     }
   }
 
@@ -74,8 +76,10 @@ export function BiometricsCard({
     if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 300) {
       onHeightChange(parsed)
       setHeightDraft(String(parsed))
+    } else if (heightDraft.trim() === '') {
+      onHeightChange(undefined)
     } else {
-      setHeightDraft(String(height))
+      setHeightDraft(height === undefined ? '' : String(height))
     }
   }
 

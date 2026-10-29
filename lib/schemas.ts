@@ -180,8 +180,8 @@ export const ProfileDocumentSchema = z
     profile: z
       .object({
         gender: GenderSchema,
-        age: z.number().int().min(13).max(120),
-        height_cm: z.number().positive().max(300),
+        age: z.number().int().min(13).max(120).optional(),
+        height_cm: z.number().positive().max(300).optional(),
         weight_history: z.array(WeightEntrySchema),
         experience_level: ExperienceLevelSchema,
         primary_goal: PrimaryGoalSchema,
