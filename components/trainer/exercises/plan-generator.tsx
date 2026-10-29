@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { filterExercisesForPlan } from '@/lib/exercise-catalog'
 import { generateWorkoutPlan } from '@/lib/ai'
 import { createWorkoutPlan } from '@/lib/plan-builder'
-import { getProfile, savePlans } from '@/lib/repositories'
+import { getProfile, getWorkouts, savePlans } from '@/lib/repositories'
 import { getAiApiKey, getAiProvider } from '@/lib/local-secrets'
 import type { Exercise } from '@/lib/trainer-data'
 import { cn } from '@/lib/utils'
@@ -73,7 +73,10 @@ export function PlanGenerator({
       return
     }
 
-    const profile = await getProfile().catch(() => undefined)
+    const [profile, recentWorkouts] = await Promise.all([
+      getProfile().catch(() => undefined),
+      getWorkouts().catch(() => []),
+    ])
 
     try {
       const provider = getAiProvider()
@@ -89,6 +92,7 @@ export function PlanGenerator({
           days_per_week: days,
           session_minutes: length,
           profile,
+          recentWorkouts,
           prefer_favorites: preferFavorites,
           exercises: pool,
         },

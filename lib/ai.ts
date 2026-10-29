@@ -170,6 +170,7 @@ export async function generateWorkoutPlan(
     session_minutes: number
     exercises: ExerciseView[]
     profile?: ProfileDocument
+    recentWorkouts?: Workout[]
     prefer_favorites: boolean
   },
   provider: AiProvider,
@@ -201,6 +202,25 @@ export async function generateWorkoutPlan(
     )
     .min(1)
     .parse(input.exercises)
+  const recentWorkouts = (input.recentWorkouts ?? [])
+    .slice()
+    .sort((left, right) => Date.parse(right.start_time) - Date.parse(left.start_time))
+    .slice(0, 3)
+    .map((workout) => ({
+      start_time: workout.start_time,
+      plan_name: workout.plan_name,
+      status: workout.status,
+      exercises: workout.exercises.map((exercise) => ({
+        exercise_name: exercise.exercise_name,
+        sets: exercise.sets.map((set) => ({
+          weight_kg: set.weight_kg,
+          reps: set.reps,
+          rir: set.rir,
+        })),
+        note_during_workout: exercise.note_during_workout,
+      })),
+      post_workout_user_notes: workout.post_workout_user_notes,
+    }))
 
   const prompt = `Jesteś trenerem personalnym i tworzysz tygodniowy plan treningowy.
 Zwróć WYŁĄCZNIE poprawny JSON, bez markdown i bez dodatkowych komentarzy.
@@ -240,11 +260,17 @@ ${JSON.stringify(
         ? {
             gender: input.profile.profile.gender,
             age: input.profile.profile.age,
+            height_cm: input.profile.profile.height_cm,
+            current_weight_kg: input.profile.profile.weight_history.at(-1)?.weight_kg,
             experience_level: input.profile.profile.experience_level,
             primary_goal: input.profile.profile.primary_goal,
+            injuries_notes: input.profile.profile.injuries_notes,
             excluded_exercise_ids: input.profile.exercise_preferences.excluded_exercise_ids,
+            favorite_exercise_ids: input.profile.exercise_preferences.favorite_exercise_ids,
+            rest_timer_defaults: input.profile.settings.rest_timer_defaults,
           }
         : null,
+      recent_workouts: recentWorkouts,
       available_exercises: exercises.map((exercise) => ({
         id: exercise.id,
         name: exercise.name,
@@ -252,6 +278,7 @@ ${JSON.stringify(
         equipment: exercise.equipment,
         rest_type: exercise.restType,
         favorite: exercise.favorite,
+        custom: exercise.custom ?? false,
       })),
     },
     null,

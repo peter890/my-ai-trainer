@@ -285,6 +285,103 @@ describe('generateWorkoutPlan', () => {
     })
   })
 
+  it('includes existing profile and recent workout context in the planning prompt', async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      days: [
+                        { name: 'Góra A', exercises: [{ exercise_id: 'bench_press', scheme: '3 x 8-10' }] },
+                        { name: 'Dół A', exercises: [{ exercise_id: 'lat_pulldown', scheme: '3 x 8-12' }] },
+                      ],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    await generateWorkoutPlan(
+      {
+        goal: 'hypertrophy',
+        level: 'intermediate',
+        days_per_week: 2,
+        session_minutes: 60,
+        exercises: availableExercises,
+        prefer_favorites: true,
+        profile: {
+          version: '1.0',
+          updated_at: '2026-10-14T18:30:00.000Z',
+          profile: {
+            gender: 'female',
+            age: 31,
+            height_cm: 170,
+            weight_history: [{ date: '2026-10-14', weight_kg: 72.5 }],
+            experience_level: 'intermediate',
+            primary_goal: 'hypertrophy',
+            injuries_notes: 'Ból prawego barku.',
+          },
+          exercise_preferences: {
+            excluded_exercise_ids: ['lat_pulldown'],
+            favorite_exercise_ids: ['bench_press'],
+            custom_exercises: [],
+          },
+          settings: {
+            rest_timer_defaults: {
+              heavy_compound: 180,
+              moderate_compound: 120,
+              isolation: 60,
+              isometric: 45,
+            },
+            rest_timer_signal: 'vibrate',
+          },
+        },
+        recentWorkouts: [
+          {
+            id: 'workout-1',
+            start_time: '2026-10-13T18:00:00.000Z',
+            end_time: '2026-10-13T19:00:00.000Z',
+            status: 'completed',
+            plan_name: 'Góra A',
+            paused_duration_ms: 0,
+            exercises: [
+              {
+                exercise_id: 'bench_press',
+                exercise_name: 'Wyciskanie sztangi',
+                sets: [{ set_number: 1, weight_kg: 70, reps: 8 }],
+                note_during_workout: '',
+              },
+            ],
+          },
+        ],
+      },
+      'gemini',
+      'api-key',
+      fetcher,
+    )
+
+    const [, request] = (fetcher as any).mock.calls[0] as [string, RequestInit]
+    const requestBody = JSON.parse(request.body as string) as {
+      contents: { parts: { text: string }[] }[]
+    }
+    const prompt = requestBody.contents[0]?.parts[0]?.text ?? ''
+    expect(prompt).toContain('"height_cm": 170')
+    expect(prompt).toContain('"current_weight_kg": 72.5')
+    expect(prompt).toContain('Ból prawego barku.')
+    expect(prompt).toContain('"weight_kg": 70')
+    expect(prompt).toContain('"custom": false')
+    expect(prompt).not.toContain('api-key')
+  })
+
   it('rejects exercises not present in the provided local catalog', async () => {
     const fetcher = vi.fn(async () =>
       new Response(
