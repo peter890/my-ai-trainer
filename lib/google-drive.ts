@@ -34,6 +34,7 @@ const DriveReplicaWorkoutsSchema = z
 export type DriveReplicaSyncResult = {
   status: 'synced' | 'conflict' | 'skipped'
   message: string
+  entity?: 'profile' | 'workouts'
 }
 
 export const DRIVE_SYNC_RESULT_EVENT = 'ai-trainer:drive-sync-result'
@@ -433,6 +434,7 @@ export function createDriveSyncSummary(): string {
 }
 
 export const DRIVE_SYNC_QUEUE_STORAGE_KEY = 'ai-trainer.drive-sync.queue'
+export const DRIVE_SYNC_METADATA_STORAGE_KEY = 'ai-trainer.drive-sync.metadata'
 
 export const DriveSyncQueueEntrySchema = z
   .object({
@@ -446,6 +448,24 @@ export const DriveSyncQueueEntrySchema = z
   .strict()
 
 export type DriveSyncQueueEntry = z.infer<typeof DriveSyncQueueEntrySchema>
+
+const DriveSyncMetadataEntrySchema = z
+  .object({
+    file_id: z.string().trim().min(1),
+    modified_time: z.string().datetime(),
+    content_fingerprint: z.string().min(1),
+    synced_at: z.string().datetime(),
+  })
+  .strict()
+
+const DriveSyncMetadataSchema = z
+  .object({
+    profile: DriveSyncMetadataEntrySchema.optional(),
+    workouts: DriveSyncMetadataEntrySchema.optional(),
+  })
+  .strict()
+
+export type DriveSyncMetadata = z.infer<typeof DriveSyncMetadataSchema>
 
 function resolveStorage(storage?: Storage): Storage | null {
   if (storage) return storage
@@ -508,6 +528,39 @@ export function getDriveSyncQueueLength(storage?: Storage): number {
   return readDriveSyncQueue(storage).length
 }
 
+export function readDriveSyncMetadata(storage?: Storage): DriveSyncMetadata {
+  const resolvedStorage = resolveStorage(storage)
+  if (!resolvedStorage) return {}
+
+  const rawValue = resolvedStorage.getItem(DRIVE_SYNC_METADATA_STORAGE_KEY)
+  if (!rawValue) return {}
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(rawValue)
+  } catch {
+    throw new Error('Metadane synchronizacji Google Drive są uszkodzone. Nie zostały wyczyszczone.')
+  }
+
+  return DriveSyncMetadataSchema.parse(parsed)
+}
+
+function writeDriveSyncMetadata(metadata: DriveSyncMetadata, storage?: Storage): void {
+  const resolvedStorage = resolveStorage(storage)
+  if (!resolvedStorage) return
+  resolvedStorage.setItem(DRIVE_SYNC_METADATA_STORAGE_KEY, JSON.stringify(DriveSyncMetadataSchema.parse(metadata)))
+}
+
+export function clearDriveSyncMetadata(storage?: Storage): void {
+  const resolvedStorage = resolveStorage(storage)
+  if (!resolvedStorage) return
+  resolvedStorage.removeItem(DRIVE_SYNC_METADATA_STORAGE_KEY)
+}
+
+function getReplicaFingerprint(value: unknown): string {
+  return JSON.stringify(value)
+}
+
 export function compareDriveTimestamps(localTimestamp?: string, remoteTimestamp?: string): 'local' | 'remote' | 'equal' | 'missing' {
   if (!localTimestamp && !remoteTimestamp) return 'equal'
   if (!localTimestamp) return 'remote'
@@ -525,6 +578,14 @@ type RemoteReplica<T> = {
   data: T
   updatedAt?: string
   file: GoogleDriveFile
+}
+
+type SyncReplicaEntityResult = DriveReplicaSyncResult & {
+  metadata?: {
+    file_id: string
+    modified_time: string
+    content_fingerprint: string
+  }
 }
 
 async function readRemoteReplica<T>(
@@ -554,16 +615,38 @@ async function syncReplicaEntity<T>(
   envelopeSchema: z.ZodType<{ version: '1.0'; updated_at: string; data: T }>,
   files: GoogleDriveFile[],
   queue: DriveSyncQueueEntry[],
-): Promise<DriveReplicaSyncResult> {
+): Promise<SyncReplicaEntityResult> {
   const remoteFile = getNewestDriveFile(files, fileName)
-  const remote = await readRemoteReplica(remoteFile, schema, envelopeSchema)
   const local = localValue === undefined ? undefined : schema.parse(localValue)
   const pendingEntry = queue.find((entry) => entry.entity === entity)
+  const metadata = readDriveSyncMetadata()[entity]
+
+  if (
+    local !== undefined &&
+    !pendingEntry &&
+    remoteFile?.modifiedTime &&
+    metadata?.file_id === remoteFile.id &&
+    metadata.modified_time === remoteFile.modifiedTime &&
+    metadata.content_fingerprint === getReplicaFingerprint(local)
+  ) {
+    return {
+      status: 'synced',
+      message: '',
+      metadata: {
+        file_id: remoteFile.id,
+        modified_time: remoteFile.modifiedTime,
+        content_fingerprint: metadata.content_fingerprint,
+      },
+    }
+  }
+
+  const remote = await readRemoteReplica(remoteFile, schema, envelopeSchema)
 
   if (local === undefined) {
     return remote
       ? {
           status: 'conflict',
+          entity,
           message: `Konflikt ${entity}: istnieją dane w Google Drive, ale brak ich lokalnie. Zaimportuj kopię przed synchronizacją.`,
         }
       : { status: 'synced', message: '' }
@@ -585,6 +668,7 @@ async function syncReplicaEntity<T>(
   if (!pendingEntry) {
     return {
       status: 'conflict',
+      entity,
       message: `Konflikt ${entity}: dane lokalne i z Google Drive różnią się. Lokalna kolejka jest pusta, więc nic nie zostało nadpisane.`,
     }
   }
@@ -592,6 +676,7 @@ async function syncReplicaEntity<T>(
   if (compareDriveTimestamps(pendingEntry.timestamp, remote.updatedAt) !== 'local') {
     return {
       status: 'conflict',
+      entity,
       message: `Konflikt ${entity}: wersja Google Drive jest nowsza lub nie ma wiarygodnego czasu. Lokalna kolejka została zachowana.`,
     }
   }
@@ -641,6 +726,27 @@ export async function syncDriveReplica(localProfile: unknown, localWorkouts: unk
   if (workoutsResult.status === 'conflict') return workoutsResult
 
   acknowledgeSyncedQueueEntries(queue)
+  const shouldRefreshMetadata =
+    queue.length > 0 ||
+    (localProfile !== undefined && !getNewestDriveFile(files, GOOGLE_DRIVE_FILE_NAMES.profile)) ||
+    (localWorkouts !== undefined && !getNewestDriveFile(files, GOOGLE_DRIVE_FILE_NAMES.workouts))
+  const syncedFiles = shouldRefreshMetadata ? await listGoogleDriveAppDataFiles() : files
+  const nextMetadata: DriveSyncMetadata = {}
+
+  for (const [entity, value] of [
+    ['profile', localProfile],
+    ['workouts', localWorkouts],
+  ] as const) {
+    const file = getNewestDriveFile(syncedFiles, GOOGLE_DRIVE_FILE_NAMES[entity])
+    if (!file?.modifiedTime || value === undefined) continue
+    nextMetadata[entity] = {
+      file_id: file.id,
+      modified_time: file.modifiedTime,
+      content_fingerprint: getReplicaFingerprint(value),
+      synced_at: new Date().toISOString(),
+    }
+  }
+  writeDriveSyncMetadata(nextMetadata)
 
   return {
     status: 'synced',

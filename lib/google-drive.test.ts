@@ -3,6 +3,7 @@ import {
   GoogleDriveFileSchema,
   GOOGLE_DRIVE_FILE_NAMES,
   GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+  DRIVE_SYNC_METADATA_STORAGE_KEY,
   clearGoogleDriveAppData,
   clearDriveSyncQueue,
   compareDriveTimestamps,
@@ -11,6 +12,7 @@ import {
   disconnectGoogleDrive,
   enqueueDriveSync,
   readPersistedGoogleDriveToken,
+  readDriveSyncMetadata,
   readDriveSyncQueue,
   syncDriveReplica,
   trySilentGoogleDriveConnection,
@@ -269,6 +271,93 @@ describe('google drive helpers', () => {
     expect(uploads).toHaveLength(2)
     expect(uploads.every((call) => call.body.includes('"version": "1.0"') && call.body.includes('"data":'))).toBe(true)
     expect(readDriveSyncQueue(storage)).toHaveLength(0)
+  })
+
+  it('skips unchanged replica downloads when remote metadata and local content match', async () => {
+    const storage = createMemoryStorage()
+    storage.setItem(
+      GOOGLE_DRIVE_TOKEN_STORAGE_KEY,
+      JSON.stringify({ access_token: 'test-token', expires_at: Date.now() + 3_600_000 }),
+    )
+    vi.stubGlobal('window', { localStorage: storage, dispatchEvent: vi.fn() })
+
+    const profile = {
+      version: '1.0' as const,
+      updated_at: '2026-10-15T12:00:00.000Z',
+      profile: {
+        gender: 'female' as const,
+        age: 28,
+        height_cm: 170,
+        weight_history: [],
+        experience_level: 'beginner' as const,
+        primary_goal: 'strength' as const,
+        injuries_notes: '',
+      },
+      exercise_preferences: {
+        excluded_exercise_ids: [],
+        favorite_exercise_ids: [],
+        custom_exercises: [],
+      },
+      settings: {
+        rest_timer_defaults: {
+          heavy_compound: 180,
+          moderate_compound: 120,
+          isolation: 60,
+          isometric: 45,
+        },
+        rest_timer_signal: 'vibrate' as const,
+      },
+    }
+    const files = {
+      profile: {
+        id: 'remote-profile',
+        name: GOOGLE_DRIVE_FILE_NAMES.profile,
+        mimeType: 'application/json',
+        modifiedTime: '2026-10-15T12:00:00.000Z',
+      },
+      workouts: {
+        id: 'remote-workouts',
+        name: GOOGLE_DRIVE_FILE_NAMES.workouts,
+        mimeType: 'application/json',
+        modifiedTime: '2026-10-15T12:01:00.000Z',
+      },
+    }
+    const requests: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        requests.push(url)
+        if (url.includes('/drive/v3/files?')) {
+          return new Response(JSON.stringify({ files: [files.profile, files.workouts] }), { status: 200 })
+        }
+        if (url.includes('/files/remote-profile?alt=media')) {
+          return new Response(
+            JSON.stringify({ version: '1.0', updated_at: profile.updated_at, data: profile }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/files/remote-workouts?alt=media')) {
+          return new Response(
+            JSON.stringify({ version: '1.0', updated_at: '2026-10-15T12:01:00.000Z', data: [] }),
+            { status: 200 },
+          )
+        }
+        return new Response('Unexpected request', { status: 500 })
+      }) as typeof fetch,
+    )
+
+    await expect(syncDriveReplica(profile, [])).resolves.toMatchObject({ status: 'synced' })
+    expect(readDriveSyncMetadata(storage)).toMatchObject({
+      profile: { file_id: files.profile.id, modified_time: files.profile.modifiedTime },
+      workouts: { file_id: files.workouts.id, modified_time: files.workouts.modifiedTime },
+    })
+    expect(storage.getItem(DRIVE_SYNC_METADATA_STORAGE_KEY)).not.toBeNull()
+
+    requests.length = 0
+    await expect(syncDriveReplica(profile, [])).resolves.toMatchObject({ status: 'synced' })
+    expect(requests.filter((url) => url.includes('?alt=media'))).toHaveLength(0)
+    expect(requests.filter((url) => url.includes('/drive/v3/files?'))).toHaveLength(1)
   })
 
   it('keeps queued changes and does not overwrite a newer remote replica', async () => {

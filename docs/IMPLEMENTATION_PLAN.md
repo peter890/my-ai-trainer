@@ -162,6 +162,7 @@ Weryfikacja lokalna E8.3: production static export przechodzi, `/manifest.webman
 - `[x] E8.6` Dodać eksport/import kopii zapasowej oraz usuwanie danych; walidować każdy import schematem Zod. Import scala dane po ID i zachowuje nowszy rekord według `updated_at` (remisy zachowują dane lokalne); klucze AI nie są eksportowane.
 - `[x] E8.7` Usunąć z UI obietnice niemożliwe/nieudokumentowane przez API, m.in. dokładne wykorzystanie miejsca Drive i warunek „tylko przez Wi-Fi”. Przegląd kart profilu potwierdził, że UI nie deklaruje tych funkcji.
 - `[x] E8.8` Testować OAuth, uprawnienia, brak sieci, konflikt, wylogowanie/wygaśnięcie tokenu, eksport/import i ochronę klucza.
+- `[x] E8.9` Dodać metadane ostatniej udanej synchronizacji dla profilu i historii treningów; pomijać pobieranie pełnej zawartości niezmienionej repliki, gdy zgadzają się `file_id`, `modifiedTime` i fingerprint lokalnych danych. Metadane są zapisywane dopiero po pomyślnej synchronizacji.
 
 **Kryterium akceptacji:** podstawowe funkcje działają bez logowania i połączenia; Drive jest repliką, nie jedynym źródłem danych; konflikty i błędy są widoczne, a klucze AI nigdy nie trafiają do synchronizacji.
 
