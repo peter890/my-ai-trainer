@@ -37,6 +37,9 @@ export const geminiAdapter: AiProviderAdapter = {
             'x-goog-api-key': apiKey,
           },
           body: JSON.stringify({
+            ...(request.systemPrompt
+              ? { systemInstruction: { parts: [{ text: request.systemPrompt }] } }
+              : {}),
             contents: [{ parts: [{ text: request.prompt }] }],
             generationConfig: {
               maxOutputTokens: request.maxOutputTokens,

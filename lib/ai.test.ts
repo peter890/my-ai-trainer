@@ -371,14 +371,31 @@ describe('generateWorkoutPlan', () => {
 
     const [, request] = (fetcher as any).mock.calls[0] as [string, RequestInit]
     const requestBody = JSON.parse(request.body as string) as {
+      systemInstruction?: { parts: { text: string }[] }
       contents: { parts: { text: string }[] }[]
     }
+    expect(requestBody.systemInstruction?.parts[0]?.text).toContain('PRIORYTETY DECYZJI')
+    expect(requestBody.systemInstruction?.parts[0]?.text).toContain('injuries_notes')
+    expect(requestBody.systemInstruction?.parts[0]?.text).toContain('excluded: true')
+    expect(requestBody.systemInstruction?.parts[0]?.text).toContain('"days":[{"name":"Góra A"')
+    expect(requestBody.systemInstruction?.parts[0]?.text).toContain('favorite: true')
+    expect(requestBody.systemInstruction?.parts[0]?.text).toContain('endurance')
     const prompt = requestBody.contents[0]?.parts[0]?.text ?? ''
-    expect(prompt).toContain('"height_cm": 170')
-    expect(prompt).toContain('"current_weight_kg": 72.5')
+    expect(prompt).toContain('DANE UŻYTKOWNIKA I KONTEKST (JSON)')
+    expect(prompt).toContain('"height_cm":170')
+    expect(prompt).toContain('"current_weight_kg":72.5')
     expect(prompt).toContain('Ból prawego barku.')
-    expect(prompt).toContain('"weight_kg": 70')
-    expect(prompt).toContain('"custom": false')
+    expect(prompt).not.toContain('"primary_goal"')
+    expect(prompt).not.toContain('"experience_level"')
+    expect(prompt).not.toContain('"rest_timer_defaults"')
+    expect(prompt).toContain('"id":"bench_press"')
+    expect(prompt).toContain('"max_kg":70')
+    expect(prompt).toContain('"reps":8')
+    expect(prompt).not.toContain('"note_during_workout"')
+    expect(prompt).not.toContain('"excluded_exercise_ids"')
+    expect(prompt).not.toContain('"custom"')
+    expect(prompt).not.toContain('"excluded": false')
+    expect(prompt).not.toContain('"favorite": false')
     expect(prompt).not.toContain('api-key')
   })
 
@@ -428,5 +445,49 @@ describe('generateWorkoutPlan', () => {
         fetcher,
       ),
     ).rejects.toThrow('spoza katalogu')
+  })
+
+  it('rejects a provider response wrapped in a plan property', async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      plan: {
+                        days: [
+                          { name: 'Góra A', exercises: [{ exercise_id: 'bench_press', scheme: '3 x 8' }] },
+                          { name: 'Dół A', exercises: [{ exercise_id: 'lat_pulldown', scheme: '3 x 10' }] },
+                        ],
+                      },
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    await expect(
+      generateWorkoutPlan(
+        {
+          goal: 'hypertrophy',
+          level: 'intermediate',
+          days_per_week: 2,
+          session_minutes: 60,
+          exercises: availableExercises,
+          prefer_favorites: false,
+        },
+        'gemini',
+        'api-key',
+        fetcher,
+      ),
+    ).rejects.toThrow('Unrecognized key')
   })
 })

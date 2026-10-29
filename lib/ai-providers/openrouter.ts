@@ -36,7 +36,10 @@ export const openRouterAdapter: AiProviderAdapter = {
         },
         body: JSON.stringify({
           model: OPENROUTER_MODEL,
-          messages: [{ role: 'user', content: request.prompt }],
+          messages: [
+            ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
+            { role: 'user', content: request.prompt },
+          ],
           max_tokens: request.maxOutputTokens,
           temperature: request.temperature,
           ...(request.reasoningMaxTokens !== undefined || request.reasoningEffort

@@ -9,6 +9,7 @@ export type AiFetcher = (input: RequestInfo | URL, init?: RequestInit) => Promis
 
 export type AiTextRequest = {
   prompt: string
+  systemPrompt?: string
   maxOutputTokens: number
   temperature: number
   responseFormat?: 'json'
