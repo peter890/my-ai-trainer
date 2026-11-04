@@ -48,7 +48,7 @@ const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const DRIVE_TOKEN_EVENT = 'ai-trainer:drive-token-changed'
 export const DRIVE_QUEUE_EVENT = 'ai-trainer:drive-queue-changed'
 export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = 'ai-trainer.drive.access-token'
-const GOOGLE_DRIVE_TOKEN_EXPIRY_BUFFER_MS = 60_000
+const GOOGLE_DRIVE_TOKEN_EXPIRY_BUFFER_MS = 5 * 60_000 // 5 minutes buffer - more generous to avoid premature token expiration
 
 const StoredGoogleDriveTokenSchema = z
   .object({
@@ -158,7 +158,7 @@ async function ensureGoogleScriptLoaded(): Promise<void> {
   return scriptPromise
 }
 
-export async function connectGoogleDrive(prompt: 'consent' | 'none' = 'consent'): Promise<string> {
+export async function connectGoogleDrive(prompt: 'consent' | 'none' = 'none'): Promise<string> {
   ensureBrowser()
 
   const clientId = getGoogleDriveClientId()

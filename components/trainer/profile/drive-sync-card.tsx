@@ -17,6 +17,7 @@ import {
   subscribeToDriveSyncQueue,
   subscribeToGoogleDriveToken,
   syncDriveReplica,
+  trySilentGoogleDriveConnection,
 } from '@/lib/google-drive'
 import { getProfile, getWorkouts, importProfile, importWorkouts } from '@/lib/repositories'
 import { cn } from '@/lib/utils'
@@ -85,6 +86,21 @@ export function DriveSyncCard() {
     setError('')
     setMessage('Łączenie z Google Drive…')
 
+    // Try silent connection first (prompt: 'none')
+    try {
+      const token = await trySilentGoogleDriveConnection()
+      if (token) {
+        setStatus('connected')
+        setQueueLength(getDriveSyncQueueLength())
+        setMessage(createDriveSyncSummary())
+        await handleSyncNow()
+        return
+      }
+    } catch {
+      // Silent connection failed, fall through to full OAuth flow
+    }
+
+    // Full OAuth consent flow
     try {
       await connectGoogleDrive()
       setStatus('connected')
