@@ -1,6 +1,26 @@
 import { Bot, Check } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
+function renderAnalysis(text: string) {
+  const lines = text.split('\n').filter((line) => line.trim().length > 0)
+  const bulletLines = lines.filter((line) => /^\s*-\s/.test(line.trim()))
+  const isMarkdownList = bulletLines.length > 0 && bulletLines.length === lines.length
+
+  if (isMarkdownList) {
+    return (
+      <ul className="space-y-2">
+        {lines.map((line, i) => {
+          const trimmed = line.trim()
+          const content = trimmed.replace(/^-\s*/, '')
+          return <li key={i} className="flex gap-2">− {content}</li>
+        })}
+      </ul>
+    )
+  }
+
+  return <p className="whitespace-pre-wrap">{text}</p>
+}
+
 type Props = {
   status: 'idle' | 'loading' | 'saving' | 'done' | 'saved' | 'error'
   analysisText?: string
@@ -66,7 +86,9 @@ export function AiFeedbackCard({ status, analysisText, errorText, onArchive, onR
 
         {status === 'done' && (
           <article className="flex flex-1 flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <p className="text-sm leading-relaxed text-foreground/90">{analysisText || 'Analiza została wygenerowana.'}</p>
+            <div className="text-sm leading-relaxed text-foreground/90">
+              {renderAnalysis(analysisText || 'Analiza została wygenerowana.')}
+            </div>
             <button
               type="button"
               onClick={onArchive}

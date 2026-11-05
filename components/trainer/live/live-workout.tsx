@@ -5,6 +5,7 @@ import {ArrowRight, Flag} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {
     deleteLiveSessionSnapshot,
+    deleteWorkout,
     getExercisePreferences,
     getExercises,
     getLiveSessionSnapshot,
@@ -549,6 +550,7 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     if (session.exercises.length === 0) {
       try {
         await deleteLiveSessionSnapshot()
+        await deleteWorkout(session.workoutId)
         setIsFinishDialogOpen(false)
         onAbort()
       } catch (cause) {

@@ -171,7 +171,10 @@ ${JSON.stringify(context, null, 2)}
 ZADANIE
 1. Oceń progresję i objętość treningową.
 2. Odnieś się do notatek dotyczących bólu, kontuzji lub zadyszki (dostosuj ciężary/ćwiczenia na przyszłość).
-3. Podaj konkretne wskazówki do wdrożenia na następnym treningu.`
+3. Podaj konkretne wskazówki do wdrożenia na następnym treningu.
+
+FORMAT ODPOWIEDZI
+Zwróć odpowiedź jako Markdown z punktami (użyj „- ” na początku każdego punktu). Nie używaj numerowania. Każdy punkt w nowej linii.`
 
   const text = await requestText(
     validProvider,
