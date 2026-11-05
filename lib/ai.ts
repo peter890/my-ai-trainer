@@ -174,7 +174,7 @@ ZADANIE
 3. Podaj konkretne wskazówki do wdrożenia na następnym treningu.
 
 FORMAT ODPOWIEDZI
-Zwróć odpowiedź jako Markdown z punktami (użyj „- ” na początku każdego punktu). Nie używaj numerowania. Każdy punkt w nowej linii.`
+Zwróć odpowiedź jako ładnie sformatowany Markdown.`
 
   const text = await requestText(
     validProvider,
