@@ -37,6 +37,7 @@ import {RestTimer} from './rest-timer'
 import {ExerciseQueue} from './exercise-queue'
 import {CardioMetricsForm} from './cardio-metrics-form'
 import {FreeExercisePicker} from './free-exercise-picker'
+import {MobileSessionPlan} from './mobile-session-plan'
 import {useScreenWakeLock} from './use-screen-wake-lock'
 
 type LiveWorkoutProps = {
@@ -78,6 +79,7 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
   const [isFinishDialogOpen, setIsFinishDialogOpen] = useState(false)
   const [isFinishing, setIsFinishing] = useState(false)
   const [finishError, setFinishError] = useState('')
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false)
   const isFinalizingRef = useRef(false)
   const persistenceQueueRef = useRef(Promise.resolve())
   const wakeLockStatus = useScreenWakeLock(Boolean(session && !session.paused))
@@ -681,6 +683,22 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
 
       <div className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-4 md:px-8 md:py-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
         <div className="flex min-w-0 flex-col gap-4">
+          {/* Mobile Session Plan - visible on mobile only */}
+          <div className="lg:hidden">
+            <MobileSessionPlan
+              exercises={session.exercises.map((item) => ({
+                id: item.exercise_id,
+                name: item.name,
+                targetSets: item.targetSets,
+                targetReps: item.targetReps,
+              }))}
+              completedCounts={session.exercises.map(completedCount)}
+              activeIndex={index}
+              onSelect={goTo}
+              onAddExercise={session.mode === 'free' ? () => setIsMobileSheetOpen(true) : undefined}
+            />
+          </div>
+
           {persistenceError ? (
             <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               Nie udało się zapisać bieżącego treningu: {persistenceError}
@@ -698,14 +716,17 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
               {restSignalNotice}
             </p>
           ) : null}
-          {session.mode === 'free' ? (
-            <FreeExercisePicker
-              exercises={availableExercises}
-              selectedIds={session.exercises.map((item) => item.exercise_id)}
-              onSelect={addFreeExercise}
-              onRemove={removeFreeExercise}
-            />
-          ) : null}
+          {/* Desktop FreeExercisePicker - hidden on mobile */}
+          <div className="hidden lg:block">
+            {session.mode === 'free' ? (
+              <FreeExercisePicker
+                exercises={availableExercises}
+                selectedIds={session.exercises.map((item) => item.exercise_id)}
+                onSelect={addFreeExercise}
+                onRemove={removeFreeExercise}
+              />
+            ) : null}
+          </div>
           {exercise ? (
             <>
               <ExerciseCard
@@ -890,6 +911,21 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
           </section>
         </div>
       ) : null}
+
+      {/* Mobile Bottom Sheet for FreeExercisePicker */}
+      {isMobileSheetOpen && session.mode === 'free' && (
+        <FreeExercisePicker
+          isMobileSheet
+          exercises={availableExercises}
+          selectedIds={session.exercises.map((item) => item.exercise_id)}
+          onSelect={(exercise) => {
+            addFreeExercise(exercise)
+            setIsMobileSheetOpen(false)
+          }}
+          onRemove={removeFreeExercise}
+          onClose={() => setIsMobileSheetOpen(false)}
+        />
+      )}
     </div>
   )
 }
