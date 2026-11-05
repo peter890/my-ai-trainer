@@ -17,7 +17,6 @@ import {
   subscribeToDriveSyncQueue,
   subscribeToGoogleDriveToken,
   syncDriveReplica,
-  trySilentGoogleDriveConnection,
 } from '@/lib/google-drive'
 import { getProfile, getWorkouts, importProfile, importWorkouts } from '@/lib/repositories'
 import { cn } from '@/lib/utils'
@@ -86,27 +85,13 @@ export function DriveSyncCard() {
     setError('')
     setMessage('Łączenie z Google Drive…')
 
-    // Try silent connection first (prompt: 'none')
+    // Zawsze pokaż ekran zgody Google - użytkownik jawno kliknął "Połącz"
     try {
-      const token = await trySilentGoogleDriveConnection()
-      if (token) {
-        setStatus('connected')
-        setQueueLength(getDriveSyncQueueLength())
-        setMessage(createDriveSyncSummary())
-        await handleSyncNow()
-        return
-      }
-    } catch {
-      // Silent connection failed, fall through to full OAuth flow
-    }
-
-    // Full OAuth consent flow
-    try {
-      await connectGoogleDrive()
+      await connectGoogleDrive('consent')
       setStatus('connected')
       setQueueLength(getDriveSyncQueueLength())
       setMessage(createDriveSyncSummary())
-      await handleSyncNow()
+      // NIE wywołuj handleSyncNow() automatycznie - użytkownik zdecyduje, czy chce synchronizować
     } catch (cause) {
       setStatus('error')
       setError(cause instanceof Error ? cause.message : 'Nie udało się połączyć z Google Drive.')
@@ -343,8 +328,8 @@ export function DriveSyncCard() {
         <div className="rounded-xl bg-secondary/40 p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">Status:</p>
           <p className="mt-1">
-            Wejście na Profil nie uruchamia logowania. Token Drive jest zapisywany w pamięci przeglądarki do
-            wygaśnięcia; po wygaśnięciu kliknij „Połącz” ponownie. Kod strony może odczytać zapisany token.
+            Synchronizacja jest ręczna — kliknij „Synchronizuj teraz”, aby wysłać zmiany do Google Drive.
+            Token jest zapisywany w pamięci przeglądarki do wygaśnięcia; po wygaśnięciu kliknij „Połącz” ponownie.
           </p>
           <p className="mt-2 text-foreground">
             Kolejka zmian: <span className="font-medium">{queueLength}</span>
