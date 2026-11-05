@@ -183,13 +183,14 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
         const paused = matchingSnapshot?.paused ?? Boolean(currentWorkout?.paused_at)
         const elapsedMs = matchingSnapshot
           ? matchingSnapshot.elapsed_ms + (paused ? 0 : snapshotAgeMs)
-          : (currentWorkout?.paused_duration_ms ?? 0) +
-            (paused
-              ? 0
-              : Math.max(
-                  0,
-                  now - Date.parse(currentWorkout?.updated_at ?? currentWorkout?.start_time ?? new Date(now).toISOString()),
-                ))
+          : (() => {
+              const startTime = currentWorkout?.start_time ? Date.parse(currentWorkout.start_time) : now
+              const lastUpdate = currentWorkout?.updated_at ? Date.parse(currentWorkout.updated_at) : startTime
+              const totalMs = now - startTime
+              const pausedSinceLastUpdate = paused ? 0 : Math.max(0, now - lastUpdate)
+              const pausedMs = (currentWorkout?.paused_duration_ms ?? 0) + pausedSinceLastUpdate
+              return Math.max(0, totalMs - pausedMs)
+            })()
         const restRemainingMs = matchingSnapshot
           ? paused
             ? matchingSnapshot.rest_remaining_ms
@@ -248,6 +249,8 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     const savedAt = Date.now()
     const elapsedMs = getSessionElapsedMs(session, savedAt)
     const restRemainingMs = getSessionRestRemainingMs(session, savedAt)
+    const totalMs = savedAt - session.startedAt
+    const pausedMs = Math.max(0, totalMs - elapsedMs)
 
     const persist = persistenceQueueRef.current.catch(() => undefined).then(async () => {
       if (isFinalizingRef.current) return
@@ -271,7 +274,7 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
           cardio: exercise.completedCardio,
         })),
         paused_at: session.paused ? new Date(savedAt).toISOString() : undefined,
-        paused_duration_ms: elapsedMs,
+        paused_duration_ms: pausedMs,
       })
       await saveLiveSessionSnapshot({
         workout_id: session.workoutId,
@@ -556,18 +559,21 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     }
 
     const now = Date.now()
+    const totalMs = now - session.startedAt
+    const activeMs = getSessionElapsedMs(session, now)
+    const pausedMs = Math.max(0, totalMs - activeMs)
 
     try {
-      await persistenceQueueRef.current
-      const completedWorkout = {
-        id: session.workoutId,
-        start_time: new Date(session.startedAt).toISOString(),
-        end_time: new Date(now).toISOString(),
-        status: 'pending_finalization' as const,
-        workout_mode: session.mode,
-        plan_name: session.planName,
-        plan_id: session.planId || undefined,
-        paused_duration_ms: getSessionElapsedMs(session, now),
+        await persistenceQueueRef.current
+        const completedWorkout = {
+          id: session.workoutId,
+          start_time: new Date(session.startedAt).toISOString(),
+          end_time: new Date(now).toISOString(),
+          status: 'pending_finalization' as const,
+          workout_mode: session.mode,
+          plan_name: session.planName,
+          plan_id: session.planId || undefined,
+          paused_duration_ms: pausedMs,
         exercises: session.exercises.map((item) => ({
           exercise_id: item.exercise_id,
           exercise_name: item.name,
