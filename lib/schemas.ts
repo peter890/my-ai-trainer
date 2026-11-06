@@ -14,7 +14,7 @@ export const EquipmentSchema = z.enum([
   'treadmill',
 ])
 export const RestTypeSchema = z.enum(['heavy_compound', 'moderate_compound', 'isolation', 'isometric', 'cardio'])
-export const RestTimerSignalSchema = z.enum(['none', 'vibrate']).default('vibrate')
+export const RestTimerSignalSchema = z.enum(['none', 'vibrate', 'sound', 'vibrate+sound']).default('vibrate')
 export const WorkoutTypeSchema = z.enum(['push', 'pull', 'legs', 'cardio'])
 export const WorkoutModeSchema = z.enum(['planned', 'free'])
 export const WorkoutStatusSchema = z.enum(['in_progress', 'pending_finalization', 'completed'])

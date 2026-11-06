@@ -29,6 +29,7 @@ export function RestSettingsCard({
   signal: RestTimerSignal
   onSignalChange: (signal: RestTimerSignal) => void
 }) {
+  const currentSignal = signal ?? 'vibrate'
   return (
     <Card>
       <CardHeader>
@@ -50,23 +51,33 @@ export function RestSettingsCard({
         <div className="flex flex-col gap-2 sm:col-span-3">
           <Label htmlFor="rest-timer-signal">Sygnał końca przerwy</Label>
           <Select
-            value={signal}
+            value={currentSignal}
             onValueChange={(value) => {
-              if (value === 'none' || value === 'vibrate') onSignalChange(value)
+              onSignalChange(value as RestTimerSignal)
             }}
           >
             <SelectTrigger id="rest-timer-signal" className="h-11 w-full bg-background">
               <SelectValue>
-                {signal === 'vibrate' ? 'Wibracja, jeśli jest obsługiwana' : 'Bez sygnału'}
+                {currentSignal === 'vibrate'
+                  ? 'Wibracja, jeśli jest obsługiwana'
+                  : currentSignal === 'sound'
+                    ? 'Dźwięk'
+                    : currentSignal === 'vibrate+sound'
+                      ? 'Wibracja + dźwięk'
+                      : 'Bez sygnału'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent align="start">
+              <SelectItem value="vibrate+sound">Wibracja + dźwięk</SelectItem>
+              <SelectItem value="sound">Dźwięk</SelectItem>
               <SelectItem value="vibrate">Wibracja, jeśli jest obsługiwana</SelectItem>
               <SelectItem value="none">Bez sygnału</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Sygnał jest wyłączony, gdy przeglądarka lub urządzenie nie obsługuje wibracji.
+            {currentSignal === 'sound' || currentSignal === 'vibrate+sound'
+              ? 'Dźwięk działa w słuchawkach. Na iOS wymaga interakcji (kliknięcia) w treningu przed pierwszym dźwiękiem.'
+              : 'Sygnał jest wyłączony, gdy przeglądarka lub urządzenie nie obsługuje wibracji.'}
           </p>
         </div>
       </CardContent>

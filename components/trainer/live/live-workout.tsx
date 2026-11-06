@@ -30,7 +30,7 @@ import {
 import type {LoggedSet} from '@/lib/trainer-data'
 import type {CardioMetrics, Exercise, ExercisePreferences, ProfileDocument, Workout, WorkoutMode} from '@/lib/schemas'
 import {getCardioSummary} from '@/lib/cardio'
-import {getExpiredRestSignalEnd, sendRestCompletionSignal} from '@/lib/rest-signal'
+import {getExpiredRestSignalEnd, sendRestCompletionSignal, playRestCompletionSound, isWebAudioSupported} from '@/lib/rest-signal'
 import {LiveWorkoutHeader} from './live-workout-header'
 import {ExerciseCard} from './exercise-card'
 import {SetsTable} from './sets-table'
@@ -83,9 +83,25 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false)
   const isFinalizingRef = useRef(false)
   const persistenceQueueRef = useRef(Promise.resolve())
+  const audioContextRef = useRef<AudioContext | null>(null)
   const wakeLockStatus = useScreenWakeLock(Boolean(session && !session.paused))
-  const [restSignal, setRestSignal] = useState<'none' | 'vibrate'>('vibrate')
+  const [restSignal, setRestSignal] = useState<'none' | 'vibrate' | 'sound' | 'vibrate+sound'>('vibrate')
   const [restSignalNotice, setRestSignalNotice] = useState('')
+
+  const ensureAudioContext = async () => {
+    if (!audioContextRef.current && isWebAudioSupported()) {
+      const AC = window.AudioContext || (window as any).webkitAudioContext
+      audioContextRef.current = new AC()
+    }
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      try {
+        await audioContextRef.current.resume()
+      } catch {
+        // Ignore resume errors
+      }
+    }
+    return audioContextRef.current
+  }
   const [bodyWeightKg, setBodyWeightKg] = useState<number | undefined>()
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([])
   const [workoutHistory, setWorkoutHistory] = useState<Workout[]>([])
@@ -315,12 +331,23 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     if (expiredEnd === null) return
 
     lastSignaledRestEnd.current = expiredEnd
+
+    // Vibration
     const vibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator
       ? () => navigator.vibrate(200)
       : undefined
-    const result = sendRestCompletionSignal(restSignal, vibrate)
+    const vibrateResult = sendRestCompletionSignal(restSignal, vibrate)
+
+    // Sound (Web Audio API)
+    const wantsSound = restSignal === 'sound' || restSignal === 'vibrate+sound'
+    if (wantsSound && audioContextRef.current) {
+      void playRestCompletionSound(audioContextRef.current).catch(() => {
+        // Ignore sound errors
+      })
+    }
+
     setRestSignalNotice(
-      result === 'unsupported' || result === 'unavailable'
+      vibrateResult === 'unsupported' || vibrateResult === 'unavailable'
         ? 'Przerwa się skończyła. Wibracja nie jest dostępna na tym urządzeniu.'
         : '',
     )
@@ -376,7 +403,8 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     }
   }
 
-  const togglePause = () => {
+  const togglePause = async () => {
+    await ensureAudioContext()
     const now = Date.now()
     setClockNow(now)
     setSession((current) => {
@@ -395,8 +423,9 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     })
   }
 
-  const goTo = (next: number) => {
+  const goTo = async (next: number) => {
     if (!session) return
+    await ensureAudioContext()
     const target = Math.max(0, Math.min(next, session.exercises.length - 1))
     setIndex(target)
     const nextExercise = session.exercises[target]
@@ -424,8 +453,9 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const logSet = () => {
+  const logSet = async () => {
     if (!exercise || !session) return
+    await ensureAudioContext()
     const parsedDraft = validateSetDraft(draft)
     if (!parsedDraft.success) {
       setDraftError(parsedDraft.error.issues[0]?.message ?? 'Popraw wartości serii.')
@@ -526,8 +556,9 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
     )
   }
 
-  const adjustRest = (deltaMs: number) => {
+  const adjustRest = async (deltaMs: number) => {
     if (!session) return
+    await ensureAudioContext()
     const now = Date.now()
     setSession((current) => {
       if (!current) return current
@@ -631,17 +662,18 @@ export function LiveWorkout({ planId, mode, onMinimize, onAbort, onFinish }: Liv
       total={Math.max(1, Math.ceil(session.restTotalMs / 1000))}
       paused={session.paused}
       onAdjust={(delta) => adjustRest(delta * 1000)}
-      onSkip={() =>
+      onSkip={async () => {
+        await ensureAudioContext()
         setSession((current) =>
           current
             ? {
                 ...current,
-              restEndsAt: null,
-              pausedRestRemainingMs: 0,
-            }
+                restEndsAt: null,
+                pausedRestRemainingMs: 0,
+              }
             : current,
         )
-      }
+      }}
     />
   ) : null
 
