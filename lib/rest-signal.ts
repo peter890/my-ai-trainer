@@ -28,44 +28,48 @@ export function sendRestCompletionSignal(
 }
 
 /**
- * Creates a countdown sound: 3 short beeps descending in pitch (like "3, 2, 1").
- * Returns array of OscillatorNodes.
+ * Creates a countdown sound: 3 pleasant beeps with pauses (like "beep... beep... beep").
+ * Each beep: 500ms sine wave at 880Hz with smooth envelope.
+ * Gap between beeps: 500ms silence.
+ * Total duration: ~3 seconds.
  */
 export function createRestCompletionSound(audioContext: AudioContext): OscillatorNode[] {
   const oscillators: OscillatorNode[] = []
-  // C6 (1046Hz), A5 (880Hz), F5 (698Hz) - descending musical notes
-  const frequencies = [1046, 880, 698]
+  const frequency = 880        // A5 - pleasant, clear tone
+  const beepDuration = 0.50    // 500ms beep
+  const gapDuration = 0.50     // 500ms pause between beeps
   const startTime = audioContext.currentTime
 
-  frequencies.forEach((freq, i) => {
+  for (let i = 0; i < 3; i++) {
     const osc = audioContext.createOscillator()
     const gain = audioContext.createGain()
 
     osc.type = 'sine'
-    osc.frequency.value = freq
+    osc.frequency.value = frequency
 
-    const beepTime = startTime + i * 0.15 // 150ms apart
+    const beepTime = startTime + i * (beepDuration + gapDuration)
+
+    // Smooth envelope: 10ms attack, sustain, exponential decay to end
     gain.gain.setValueAtTime(0, beepTime)
     gain.gain.linearRampToValueAtTime(0.3, beepTime + 0.01)
-    gain.gain.exponentialRampToValueAtTime(0.01, beepTime + 0.12)
+    gain.gain.exponentialRampToValueAtTime(0.01, beepTime + beepDuration)
 
     osc.connect(gain).connect(audioContext.destination)
     osc.start(beepTime)
-    osc.stop(beepTime + 0.15)
+    osc.stop(beepTime + beepDuration + 0.05)
 
     oscillators.push(osc)
-  })
+  }
 
   return oscillators
 }
 
 /**
- * Plays the rest completion sound (countdown: 3 beeps high → mid → low).
+ * Plays the rest completion sound (3 beeps with pauses).
  * Returns a Promise that resolves when all beeps finish.
  * Handles AudioContext suspension (required on iOS after user interaction).
  */
 export async function playRestCompletionSound(audioContext: AudioContext): Promise<void> {
-  // Resume context if suspended (iOS requirement after first user interaction)
   if (audioContext.state === 'suspended') {
     await audioContext.resume()
   }
@@ -75,8 +79,8 @@ export async function playRestCompletionSound(audioContext: AudioContext): Promi
 
   return new Promise((resolve) => {
     lastOsc.onended = () => resolve()
-    // Fallback: 3 beeps * 150ms + buffer
-    setTimeout(resolve, 600)
+    // Fallback: 3 * (500ms + 500ms) + buffer = ~3.5s
+    setTimeout(resolve, 4000)
   })
 }
 
