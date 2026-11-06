@@ -205,7 +205,7 @@ export const ProfileDocumentSchema = z
             isometric: z.number().int().min(1).max(3600).default(45),
           })
           .strict(),
-          rest_timer_signal: RestTimerSignalSchema,
+        rest_timer_signal: RestTimerSignalSchema,
       })
       .strict(),
   })
