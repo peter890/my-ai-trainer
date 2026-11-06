@@ -11,6 +11,7 @@ import type { WorkoutLog } from '@/lib/trainer-data'
 import { CardioMetricsForm } from '@/components/trainer/live/cardio-metrics-form'
 import { WorkoutSchema, type Workout } from '@/lib/schemas'
 import { cn } from '@/lib/utils'
+import ReactMarkdown from 'react-markdown'
 
 type Props = {
   date: string
@@ -192,14 +193,9 @@ export function WorkoutDetail({ date, log, workout, onSave, onDelete }: Props) {
             <Bot className="size-4" aria-hidden="true" />
             Feedback Trenera AI
           </p>
-          <ul className="flex flex-col gap-1.5">
-            {log.aiFeedback.map((item) => (
-              <li key={item} className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden="true" />
-                {item}
-              </li>
-            ))}
-          </ul>
+          <div className="text-sm leading-relaxed text-muted-foreground">
+            <ReactMarkdown>{log.aiFeedback.join('\n')}</ReactMarkdown>
+          </div>
         </div>
           </>
         )}
