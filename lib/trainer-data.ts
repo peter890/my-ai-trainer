@@ -14,6 +14,7 @@ export type Exercise = {
   id: string
   name: string
   active: boolean
+  archived?: boolean
   muscle: MuscleGroup
   equipment: string
   restType: RestType

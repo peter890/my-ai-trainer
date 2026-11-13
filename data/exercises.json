@@ -1,7 +1,7 @@
 [
   {
     "id": "bench-press",
-    "name": "Wyciskanie sztangi leżąc",
+    "name": "Wyciskanie sztangi leżąc (Bench Press)",
     "category": "chest",
     "equipment": "barbell",
     "rest_type": "heavy_compound",
@@ -9,7 +9,7 @@
   },
   {
     "id": "incline-dumbbell-press",
-    "name": "Wyciskanie hantli na skosie",
+    "name": "Wyciskanie hantli na skosie (Incline Dumbbell Press)",
     "category": "chest",
     "equipment": "dumbbell",
     "rest_type": "moderate_compound",
@@ -17,7 +17,7 @@
   },
   {
     "id": "cable-fly",
-    "name": "Rozpiętki na bramie",
+    "name": "Rozpiętki na bramie (Cable Fly)",
     "category": "chest",
     "equipment": "cable",
     "rest_type": "isolation",
@@ -25,7 +25,7 @@
   },
   {
     "id": "dip",
-    "name": "Pompki na poręczach",
+    "name": "Pompki na poręczach (Dips)",
     "category": "chest",
     "equipment": "calisthenics",
     "rest_type": "moderate_compound",
@@ -33,7 +33,7 @@
   },
   {
     "id": "chest-press-machine",
-    "name": "Wyciskanie na maszynie",
+    "name": "Wyciskanie na maszynie (Chest Press)",
     "category": "chest",
     "equipment": "machine",
     "rest_type": "moderate_compound",
@@ -41,7 +41,7 @@
   },
   {
     "id": "chest-fly-machine",
-    "name": "Rozpiętki na maszynie (Butterfly)",
+    "name": "Rozpiętki na maszynie (Butterfly / Chest Fly)",
     "category": "chest",
     "equipment": "machine",
     "rest_type": "isolation",
@@ -49,7 +49,7 @@
   },
   {
     "id": "pull-up",
-    "name": "Podciąganie nachwytem",
+    "name": "Podciąganie nachwytem (Pull-up)",
     "category": "back",
     "equipment": "calisthenics",
     "rest_type": "moderate_compound",
@@ -57,7 +57,7 @@
   },
   {
     "id": "barbell-row",
-    "name": "Wiosłowanie sztangą",
+    "name": "Wiosłowanie sztangą (Barbell Row)",
     "category": "back",
     "equipment": "barbell",
     "rest_type": "heavy_compound",
@@ -65,7 +65,7 @@
   },
   {
     "id": "lat-pulldown",
-    "name": "Ściąganie drążka wyciągu",
+    "name": "Ściąganie drążka wyciągu (Lat Pulldown)",
     "category": "back",
     "equipment": "cable",
     "rest_type": "moderate_compound",
@@ -73,7 +73,7 @@
   },
   {
     "id": "back-extension",
-    "name": "Prostowanie grzbietu (Ławka rzymska)",
+    "name": "Prostowanie grzbietu / Ławka rzymska (Back Extension)",
     "category": "back",
     "equipment": "machine",
     "rest_type": "isolation",
@@ -81,7 +81,7 @@
   },
   {
     "id": "overhead-press",
-    "name": "Wyciskanie żołnierskie",
+    "name": "Wyciskanie żołnierskie (Overhead Press / OHP)",
     "category": "shoulders",
     "equipment": "barbell",
     "rest_type": "heavy_compound",
@@ -89,7 +89,7 @@
   },
   {
     "id": "cable-lateral-raise",
-    "name": "Wznosy bokiem na wyciągu",
+    "name": "Wznosy bokiem na wyciągu (Cable Lateral Raise)",
     "category": "shoulders",
     "equipment": "cable",
     "rest_type": "isolation",
@@ -97,7 +97,7 @@
   },
   {
     "id": "face-pull",
-    "name": "Face pull",
+    "name": "Przyciąganie liny do twarzy (Face Pull)",
     "category": "shoulders",
     "equipment": "cable",
     "rest_type": "isolation",
@@ -105,7 +105,7 @@
   },
   {
     "id": "shoulder-press-machine",
-    "name": "Wyciskanie na barki na maszynie",
+    "name": "Wyciskanie na barki na maszynie (Shoulder Press)",
     "category": "shoulders",
     "equipment": "machine",
     "rest_type": "moderate_compound",
@@ -113,7 +113,7 @@
   },
   {
     "id": "reverse-fly-machine",
-    "name": "Odwrotne rozpiętki na maszynie",
+    "name": "Odwrotne rozpiętki na maszynie (Reverse Fly / Rear Delt)",
     "category": "shoulders",
     "equipment": "machine",
     "rest_type": "isolation",
@@ -121,7 +121,7 @@
   },
   {
     "id": "barbell-squat",
-    "name": "Przysiad ze sztangą",
+    "name": "Przysiad ze sztangą (Barbell Squat)",
     "category": "legs",
     "equipment": "barbell",
     "rest_type": "heavy_compound",
@@ -129,7 +129,7 @@
   },
   {
     "id": "romanian-deadlift",
-    "name": "Martwy ciąg rumuński",
+    "name": "Martwy ciąg rumuński (Romanian Deadlift / RDL)",
     "category": "legs",
     "equipment": "barbell",
     "rest_type": "heavy_compound",
@@ -137,7 +137,7 @@
   },
   {
     "id": "leg-press",
-    "name": "Wypychanie na suwnicy",
+    "name": "Wypychanie na suwnicy (Leg Press)",
     "category": "legs",
     "equipment": "machine",
     "rest_type": "moderate_compound",
@@ -145,7 +145,7 @@
   },
   {
     "id": "bulgarian-split-squat",
-    "name": "Wykroki bułgarskie",
+    "name": "Wykroki bułgarskie (Bulgarian Split Squat)",
     "category": "legs",
     "equipment": "dumbbell",
     "rest_type": "moderate_compound",
@@ -153,7 +153,7 @@
   },
   {
     "id": "leg-extension",
-    "name": "Prostowanie nóg na maszynie",
+    "name": "Prostowanie nóg na maszynie (Leg Extension)",
     "category": "legs",
     "equipment": "machine",
     "rest_type": "isolation",
@@ -161,7 +161,7 @@
   },
   {
     "id": "leg-curl",
-    "name": "Uginanie nóg na maszynie",
+    "name": "Uginanie nóg na maszynie (Leg Curl)",
     "category": "legs",
     "equipment": "machine",
     "rest_type": "isolation",
@@ -185,7 +185,7 @@
   },
   {
     "id": "dumbbell-curl",
-    "name": "Uginanie z hantlami",
+    "name": "Uginanie z hantlami (Dumbbell Bicep Curl)",
     "category": "arms",
     "equipment": "dumbbell",
     "rest_type": "isolation",
@@ -193,7 +193,7 @@
   },
   {
     "id": "cable-triceps-extension",
-    "name": "Prostowanie ramion na wyciągu",
+    "name": "Prostowanie ramion na wyciągu (Cable Triceps Pushdown / Extension)",
     "category": "arms",
     "equipment": "cable",
     "rest_type": "isolation",
@@ -201,7 +201,7 @@
   },
   {
     "id": "triceps-press-machine",
-    "name": "Wyciskanie na triceps na maszynie",
+    "name": "Wyciskanie na triceps na maszynie (Triceps Press / Dip Machine)",
     "category": "arms",
     "equipment": "machine",
     "rest_type": "moderate_compound",
@@ -209,7 +209,7 @@
   },
   {
     "id": "plank",
-    "name": "Plank",
+    "name": "Deska (Plank)",
     "category": "abs",
     "equipment": "calisthenics",
     "rest_type": "isometric",
@@ -217,7 +217,7 @@
   },
   {
     "id": "cable-crunch",
-    "name": "Spięcia brzucha na wyciągu",
+    "name": "Spięcia brzucha na wyciągu (Cable Crunch)",
     "category": "abs",
     "equipment": "cable",
     "rest_type": "isolation",
@@ -225,7 +225,7 @@
   },
   {
     "id": "abdominal-machine",
-    "name": "Spięcia brzucha na maszynie",
+    "name": "Spięcia brzucha na maszynie (Abdominal Crunch)",
     "category": "abs",
     "equipment": "machine",
     "rest_type": "isolation",
@@ -233,7 +233,7 @@
   },
   {
     "id": "treadmill",
-    "name": "Bieżnia",
+    "name": "Bieżnia (Treadmill)",
     "category": "cardio",
     "equipment": "treadmill",
     "rest_type": "cardio",
@@ -241,7 +241,7 @@
   },
   {
     "id": "push-up",
-    "name": "Klasyczne pompki na podłodze",
+    "name": "Klasyczne pompki na podłodze (Push-ups)",
     "category": "chest",
     "equipment": "calisthenics",
     "rest_type": "moderate_compound",
@@ -249,7 +249,7 @@
   },
   {
     "id": "stationary-bike",
-    "name": "Rowerek stacjonarny",
+    "name": "Rowerek stacjonarny (Stationary Bike)",
     "category": "cardio",
     "equipment": "machine",
     "rest_type": "cardio",
@@ -257,7 +257,7 @@
   },
   {
     "id": "elliptical",
-    "name": "Orbitrek (Maszyna eliptyczna)",
+    "name": "Orbitrek / Maszyna eliptyczna (Elliptical / Cross Trainer)",
     "category": "cardio",
     "equipment": "machine",
     "rest_type": "cardio",
@@ -265,7 +265,7 @@
   },
   {
     "id": "farmer-walk",
-    "name": "Spacer farmera",
+    "name": "Spacer farmera (Farmer's Walk)",
     "category": "legs",
     "equipment": "dumbbell",
     "rest_type": "heavy_compound",
@@ -273,7 +273,7 @@
   },
   {
     "id": "seated-row",
-    "name": "Wiosłowanie siedząc na maszynie / wyciągu",
+    "name": "Wiosłowanie siedząc na maszynie / wyciągu (Seated Row)",
     "category": "back",
     "equipment": "machine",
     "rest_type": "moderate_compound",
@@ -281,7 +281,7 @@
   },
   {
     "id": "stairs",
-    "name": "Schody treningowe / Stepper schodkowy",
+    "name": "Schody treningowe / Stepper schodkowy (Stair Climber / StairMaster)",
     "category": "cardio",
     "equipment": "machine",
     "rest_type": "cardio",

@@ -143,11 +143,30 @@ export const ExerciseSchema = z
     updated_at: IsoDateTimeSchema.optional(),
     name: z.string().trim().min(1).max(120),
     active: z.boolean().default(true),
+    archived: z.boolean().default(false).optional(),
     category: MuscleGroupSchema,
     equipment: EquipmentSchema,
     rest_type: RestTypeSchema,
     technique_note: z.string().max(2000).default(''),
     custom: z.boolean().default(false),
+  })
+  .strict()
+
+export const ExerciseCatalogEntrySchema = z
+  .object({
+    id: EntityIdSchema,
+    name: z.string().trim().min(1).max(120),
+    category: MuscleGroupSchema,
+    equipment: EquipmentSchema,
+    rest_type: RestTypeSchema,
+    technique_note: z.string().max(2000).default(''),
+  })
+  .strict()
+
+export const ExerciseCatalogManifestSchema = z
+  .object({
+    hash: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+    exercises: z.array(ExerciseCatalogEntrySchema),
   })
   .strict()
 
@@ -420,6 +439,8 @@ export type GeneratedWorkoutPlan = z.infer<typeof GeneratedWorkoutPlanSchema>
 export type WeightEntry = z.infer<typeof WeightEntrySchema>
 export type Exercise = z.infer<typeof ExerciseSchema>
 export type ExerciseInput = z.input<typeof ExerciseSchema>
+export type ExerciseCatalogEntry = z.infer<typeof ExerciseCatalogEntrySchema>
+export type ExerciseCatalogManifest = z.infer<typeof ExerciseCatalogManifestSchema>
 export type CustomExercise = z.infer<typeof CustomExerciseSchema>
 export type ExercisePreferences = z.infer<typeof ExercisePreferencesSchema>
 export type ExercisePreferencesInput = z.input<typeof ExercisePreferencesSchema>

@@ -331,7 +331,7 @@ describe('IndexedDB repositories', () => {
     const upgradedDatabase = await openDatabase(name)
     openDatabases.push(upgradedDatabase)
 
-    expect(upgradedDatabase.version).toBe(5)
+    expect(upgradedDatabase.version).toBe(6)
     expect(upgradedDatabase.objectStoreNames.contains('exercise_preferences')).toBe(true)
     expect(upgradedDatabase.objectStoreNames.contains('live_session')).toBe(true)
   })

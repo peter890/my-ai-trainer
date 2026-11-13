@@ -1,17 +1,20 @@
 const BUILD_ID = '__BUILD_ID__'
-const CACHE_NAME = `ai-trainer-shell-${BUILD_ID}`
+const CATALOG_HASH = '__CATALOG_HASH__'
+const CACHE_NAME = `ai-trainer-shell-${BUILD_ID}-${CATALOG_HASH}`
 const APP_SHELL = [
   '/',
   '/icon.svg',
   '/apple-icon.png',
   '/icons/ai-trainer-192.png',
   '/icons/ai-trainer-512.png',
+  '/exercise-catalog-manifest.json',
 ]
 const CACHEABLE_ASSETS = new Set([
   '/icon.svg',
   '/apple-icon.png',
   '/icons/ai-trainer-192.png',
   '/icons/ai-trainer-512.png',
+  '/exercise-catalog-manifest.json',
 ])
 
 self.addEventListener('install', (event) => {

@@ -18,6 +18,7 @@ export function ExercisesView() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [catalogUpdated, setCatalogUpdated] = useState(false)
 
   const loadCatalog = async () => {
     setLoading(true)
@@ -26,6 +27,7 @@ export function ExercisesView() {
       const result = await initializeExerciseCatalog()
       setRecords(result.exercises)
       setPreferences(result.preferences)
+      setCatalogUpdated(result.catalogUpdated)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Nie udało się wczytać katalogu ćwiczeń.')
     } finally {
@@ -40,6 +42,7 @@ export function ExercisesView() {
         if (cancelled) return
         setRecords(result.exercises)
         setPreferences(result.preferences)
+        setCatalogUpdated(result.catalogUpdated)
       })
       .catch((cause: unknown) => {
         if (cancelled) return
@@ -55,7 +58,10 @@ export function ExercisesView() {
   }, [])
 
   const exercises = useMemo(
-    () => records.map((exercise) => toExerciseView(exercise, preferences)),
+    () =>
+      records
+        .filter((exercise) => !exercise.archived)
+        .map((exercise) => toExerciseView(exercise, preferences)),
     [records, preferences],
   )
 
@@ -164,6 +170,11 @@ export function ExercisesView() {
             Spróbuj ponownie
           </button>
         </div>
+      )}
+      {catalogUpdated && (
+        <p role="status" className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
+          Katalog ćwiczeń został zaktualizowany.
+        </p>
       )}
 
       <Tabs defaultValue="catalog" className="gap-4">

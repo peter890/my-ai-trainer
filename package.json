@@ -4,8 +4,9 @@
   "private": true,
   "packageManager": "pnpm@12.3.4",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build && node scripts/stamp-sw.mjs",
+    "generate:exercise-catalog": "node scripts/generate-exercise-catalog-manifest.mjs",
+    "dev": "pnpm generate:exercise-catalog && next dev",
+    "build": "pnpm generate:exercise-catalog && next build && node scripts/stamp-sw.mjs",
     "lint": "eslint .",
     "start": "next start",
     "test": "vitest run",

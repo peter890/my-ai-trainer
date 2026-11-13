@@ -2,7 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { Exercise, LiveSessionSnapshot, ProfileDocument, Workout, WorkoutPlan } from './schemas'
 
 export const DATABASE_NAME = 'ai-trainer'
-export const DATABASE_VERSION = 5
+export const DATABASE_VERSION = 6
 
 export interface TrainerDatabase extends DBSchema {
   profile: {
@@ -12,6 +12,12 @@ export interface TrainerDatabase extends DBSchema {
   exercises: {
     key: string
     value: Exercise
+  }
+  exercise_catalog_meta: {
+    key: 'current'
+    value: {
+      hash: string
+    }
   }
   exercise_preferences: {
     key: 'current'
@@ -43,6 +49,9 @@ export function openDatabase(name = DATABASE_NAME): Promise<IDBPDatabase<Trainer
       }
       if (!database.objectStoreNames.contains('exercises')) {
         database.createObjectStore('exercises', { keyPath: 'id' })
+      }
+      if (!database.objectStoreNames.contains('exercise_catalog_meta')) {
+        database.createObjectStore('exercise_catalog_meta')
       }
       if (!database.objectStoreNames.contains('exercise_preferences')) {
         database.createObjectStore('exercise_preferences')
